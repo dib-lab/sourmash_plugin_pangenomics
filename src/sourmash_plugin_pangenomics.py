@@ -27,13 +27,30 @@ class Command_CreateDB(CommandLinePlugin):
 
     def __init__(self, subparser):
         super().__init__(subparser)
-        # add argparse arguments here.
-        debug_literal('RUNNING cmd_xyz.__init__')
+        p = subparser
+
+        p.add_argument(
+            '-t', '--taxonomy-file', '--taxonomy', metavar='FILE',
+            action="extend", nargs='+', required=True,
+            help='database lineages file'
+        )
+        p.add_argument(
+            'sketches', nargs='+',
+            help='sketches to combine'
+        )
+        p.add_argument('--scaled', default=1000, type=int)
+        p.add_argument('-k', '--ksize', default=31, type=int)
+        p.add_argument('-m', '--moltype') # Use to assert that the moltype in the sketches == moltype use wants
+        p.add_argument('-o', '--output', required=True,
+                        help='Define a filename for the pangenome signatures (.zip preferred).')
+        p.add_argument('--csv', help='A CSV file generated to contain the lineage rank, genome name, hash count, and genome count.')
+        p.add_argument('-r', '--rank', default='species')
+        p.add_argument('-a', '--abund', action='store_true', help='Enable abundance tracking of hashes across rank selection.')
 
     def main(self, args):
         # code that we actually run.
         super().main(args)
-        print('RUNNING cmd', self, args)
+        return make_pangenome_sketches_main(args)
 
 
 class Command_RankTable(CommandLinePlugin):
@@ -45,13 +62,19 @@ class Command_RankTable(CommandLinePlugin):
 
     def __init__(self, subparser):
         super().__init__(subparser)
-        # add argparse arguments here.
-        debug_literal('RUNNING cmd_xyz.__init__')
+        p = subparser
+        p.add_argument('data', metavar='SOURMASH_DATABASE', help='The sourmash dictionary created from `process_ss.py`')
+        p.add_argument('-k', '--ksize', type=int, default=31, help='The ksize of the sourmash pangenome database')
+        p.add_argument('-l', '--lineage', help='The specific lineage to extract from the sourmash pangenome database (e.g. "s__Escherichia coli")')
+        p.add_argument('-i', '--ignore-case', action='store_true', help='Ignore the casing of search terms')
+        p.add_argument('-o', '--output-hash-classification', required=False,
+                       help='CSV file containing classification of each hash')
 
     def main(self, args):
         # code that we actually run.
         super().main(args)
         print('RUNNING cmd', self, args)
+        return pangenome_elements_main(args)
 
 
 class Command_Classify(CommandLinePlugin):
@@ -63,13 +86,17 @@ class Command_Classify(CommandLinePlugin):
 
     def __init__(self, subparser):
         super().__init__(subparser)
+        p = subparser
         # add argparse arguments here.
         debug_literal('RUNNING cmd_xyz.__init__')
+        p.add_argument('metagenome_sig')
+        p.add_argument('-k', '--ksize', default=31, help='k-mer size', type=int)
+        p.add_argument('classify_csv_files', nargs='+')
 
     def main(self, args):
         # code that we actually run.
         super().main(args)
-        print('RUNNING cmd', self, args)
+        return classify_hashes_main(args)
 
 
 ### script make-pangenome-sketches.py
@@ -83,27 +110,7 @@ import sourmash
 from sourmash import sourmash_args
 from sourmash.tax import tax_utils
 
-def make_pangenome_sketchs_main():
-    p = argparse.ArgumentParser()
-    p.add_argument(
-        '-t', '--taxonomy-file', '--taxonomy', metavar='FILE',
-        action="extend", nargs='+', required=True,
-        help='database lineages file'
-    )
-    p.add_argument(
-        'sketches', nargs='+',
-        help='sketches to combine'
-    )
-    p.add_argument('--scaled', default=1000, type=int)
-    p.add_argument('-k', '--ksize', default=31, type=int)
-    p.add_argument('-m', '--moltype') # Use to assert that the moltype in the sketches == moltype use wants
-    p.add_argument('-o', '--output', required=True,
-                    help='Define a filename for the pangenome signatures (.zip preferred).')
-    p.add_argument('--csv', help='A CSV file generated to contain the lineage rank, genome name, hash count, and genome count.')
-    p.add_argument('-r', '--rank', default='species')
-    p.add_argument('-a', '--abund', action='store_true', help='Enable abundance tracking of hashes across rank selection.')
-    args = p.parse_args()
-
+def make_pangenome_sketches_main(args):
     print(f"loading taxonomies from {args.taxonomy_file}")
     taxdb = sourmash.tax.tax_utils.MultiLineageDB.load(args.taxonomy_file)
     print(f"found {len(taxdb)} identifiers in taxdb.")
@@ -431,14 +438,7 @@ def pangenome_elements(data):
                 surface_cloud.append((nested_key, nested_value))
         return central_core, external_core, shell, inner_cloud, surface_cloud
 
-def pangenome_elements_main():
-    p = argparse.ArgumentParser(description='Create pangenome elements from sourmash pangenome database')
-    p.add_argument('data', metavar='SOURMASH_DATABASE', help='The sourmash dictionary created from `process_ss.py`')
-    p.add_argument('-k', '--ksize', type=int, default=31, help='The ksize of the sourmash pangenome database')
-    p.add_argument('-l', '--lineage', help='The specific lineage to extract from the sourmash pangenome database (e.g. "s__Escherichia coli")')
-    p.add_argument('-i', '--ignore-case', action='store_true', help='Ignore the casing of search terms')
-    p.add_argument('-o', '--output-hash-classification', required=False,
-                   help='CSV file containing classification of each hash')
+def pangenome_elements_main(args):
     args = p.parse_args()
 
     ss_dict = db_process(filename=args.data, k=args.ksize, lineage_name=args.lineage, ignore_case=args.ignore_case, invert_match=False)
@@ -473,13 +473,7 @@ import pprint
 
 from sourmash.save_load import SaveSignaturesToLocation
 
-def classify_hashes_main():
-    p = argparse.ArgumentParser()
-    p.add_argument('metagenome_sig')
-    p.add_argument('-k', '--ksize', default=31, help='k-mer size', type=int)
-    p.add_argument('classify_csv_files', nargs='+')
-    args = p.parse_args()
-
+def classify_hashes_main(args):
     db = sourmash.load_file_as_index(args.metagenome_sig)
     db = db.select(ksize=args.ksize)
     sketches = list(db.signatures())

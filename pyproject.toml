@@ -14,5 +14,7 @@ license = { text = "BSD 3-Clause License" }
 # that your plugin defines; remove the rest. Multiple entry points of
 # any particular type are perfectly fine too!
 
-#[project.entry-points."sourmash.cli_script"]
-#xyz_command = "sourmash_plugin_xyz:Command_XYZ"
+[project.entry-points."sourmash.cli_script"]
+createdb_command = "sourmash_plugin_pangenomics:Command_CreateDB"
+ranktable_command = "sourmash_plugin_pangenomics:Command_RankTable"
+classify_command = "sourmash_plugin_pangenomics:Command_Classify"
