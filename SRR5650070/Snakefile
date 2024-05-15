@@ -1,0 +1,53 @@
+rule all:
+    input:
+        "test_output/agathobacter_faecis.csv",
+        "test_output/SRR5650070.x.gtdb-rs214-agatha.gather.txt",
+        "test_output/agathobacter_faecis_hashes.txt",
+
+rule fastgather:
+    input:
+        sig= "SRR5650070.trim.sig.zip",
+        db="gtdb-rs214-agatha-k21.zip",
+    output:
+        "test_output/SRR5650070.x.gtdb-rs214-agatha.fastgather.csv",
+    shell: """
+        sourmash scripts fastgather {input.sig} {input.db} \
+            -o {output} -k 21 -t 0
+            """
+
+rule merge_agatha:
+    input:
+        db="gtdb-rs214-agatha-k21.zip",
+        tax="gtdb-rs214-agatha.lineages.csv.gz",
+    output:
+        pangenome_sig="agatha-merged.sig.zip",
+    shell: """
+        sourmash scripts pangenomics_createdb {input.db} -t {input.tax} \
+            -o {output} --abund -k 21
+    """
+        
+
+
+rule build_classify_hashes:
+    input:
+        pangenome_sig="agatha-merged.sig.zip",
+    output:
+        csv="test_output/agathobacter_faecis.csv",
+    params:
+        ksize=21,
+        name="GCF_020557615 s__Agathobacter faecis",
+    shell: """
+        sourmash scripts pangenomics_ranktable {input.pangenome_sig} \
+             -o {output.csv} -k {params.ksize} -l {params.name:q}
+    """
+
+rule pangenome_classify:
+    input:
+        sig="SRR5650070.trim.sig.zip",
+        hash_csv="agathobacter_faecis.csv",
+    output:
+        "test_output/agathobacter_faecis_hashes.txt",
+    shell: """
+        sourmash scripts pangenomics_classify {input.sig} {input.hash_csv} \
+            -k 21 > {output}
+            """
