@@ -4,15 +4,15 @@ description = "sourmash plugin to do pangenomics."
 readme = "README.md"
 requires-python = ">=3.10"
 version = "0.1"
+authors = [
+  {name = "Colton Baumler", email = "ccbaumler@ucdavis.edu"},
+  {name = "Titus Brown", email = "titus@idyll.org"},
+]
 
 dependencies = ["sourmash>=4.8.8,<5"]
 
 [metadata]
 license = { text = "BSD 3-Clause License" }
-
-# CTB note: you only need to include information about the entry points
-# that your plugin defines; remove the rest. Multiple entry points of
-# any particular type are perfectly fine too!
 
 [project.entry-points."sourmash.cli_script"]
 createdb_command = "sourmash_plugin_pangenomics:Command_CreateDB"
