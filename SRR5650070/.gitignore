@@ -1,0 +1,4 @@
+test_output
+.snakemake/
+agatha-merged.sig.zip
+agathobacter_faecis.csv
