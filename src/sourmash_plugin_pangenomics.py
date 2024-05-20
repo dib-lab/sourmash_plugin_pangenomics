@@ -166,6 +166,7 @@ class Command_Classify(CommandLinePlugin):
 
 ### script make-pangenome-sketches.py
 
+
 def make_pangenome_sketches_main(args):
     print(f"loading taxonomies from {args.taxonomy_file}")
     taxdb = sourmash.tax.tax_utils.MultiLineageDB.load(args.taxonomy_file)
@@ -320,6 +321,7 @@ def check_csv(csv_file):
 
 
 ### db_process function from script process_ss.py
+
 
 def db_process(
     filename,
@@ -483,6 +485,7 @@ def db_process(
 
 ### script pangenome_elements.py
 
+
 def pangenome_elements(data):
     # get the pangenome elements of the dicts for each rank pangenome
     for i, (key, nested_dict) in enumerate(data.items()):
@@ -547,6 +550,7 @@ def pangenome_elements_main(args):
 
 
 ### script classify-hashes.py
+
 
 def classify_hashes_main(args):
     db = sourmash.load_file_as_index(args.metagenome_sig)
