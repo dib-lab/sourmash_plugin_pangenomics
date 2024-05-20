@@ -3,7 +3,7 @@ name = "sourmash_plugin_pangenomics"
 description = "sourmash plugin to do pangenomics."
 readme = "README.md"
 requires-python = ">=3.10"
-version = "0.1"
+version = "0.2"
 authors = [
   {name = "Colton Baumler", email = "ccbaumler@ucdavis.edu"},
   {name = "Titus Brown", email = "titus@idyll.org"},
