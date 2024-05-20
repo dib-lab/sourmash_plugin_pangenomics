@@ -45,7 +45,7 @@ NAMES = {
 
 
 class Command_CreateDB(CommandLinePlugin):
-    command = "pangenomics_createdb"  # 'scripts <command>'
+    command = "pangenome_createdb"  # 'scripts <command>'
     description = "@CTB"  # output with -h
     usage = "@CTB"  # output with no args/bad args as well as -h
     epilog = epilog  # output with -h
@@ -96,7 +96,7 @@ class Command_CreateDB(CommandLinePlugin):
 
 
 class Command_RankTable(CommandLinePlugin):
-    command = "pangenomics_ranktable"  # 'scripts <command>'
+    command = "pangenome_ranktable"  # 'scripts <command>'
     description = "@CTB"  # output with -h
     usage = "@CTB"  # output with no args/bad args as well as -h
     epilog = epilog  # output with -h
@@ -143,7 +143,7 @@ class Command_RankTable(CommandLinePlugin):
 
 
 class Command_Classify(CommandLinePlugin):
-    command = "pangenomics_classify"  # 'scripts <command>'
+    command = "pangenome_classify"  # 'scripts <command>'
     description = "@CTB"  # output with -h
     usage = "@CTB"  # output with no args/bad args as well as -h
     epilog = epilog  # output with -h
