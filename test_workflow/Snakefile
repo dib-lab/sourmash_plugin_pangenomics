@@ -1,7 +1,6 @@
 rule all:
     input:
         "test_output/agathobacter_faecis.csv",
-        "test_output/SRR5650070.x.gtdb-rs214-agatha.gather.txt",
         "test_output/agathobacter_faecis_hashes.txt",
 
 rule fastgather:
