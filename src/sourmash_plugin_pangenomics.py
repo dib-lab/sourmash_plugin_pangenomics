@@ -1,6 +1,6 @@
 """pangenomics plugin"""
 
-epilog="""
+epilog = """
 See https://github.com/dib-lab/sourmash_plugin_pangenomics for more examples.
 
 Need help? Have questions? Ask at http://github.com/sourmash-bio/sourmash/issues!
@@ -18,34 +18,51 @@ from sourmash.plugins import CommandLinePlugin
 # CLI plugins - supports 'sourmash scripts <commands>'
 #
 
+
 class Command_CreateDB(CommandLinePlugin):
-    command = 'pangenomics_createdb'             # 'scripts <command>'
-    description = "@CTB"       # output with -h
-    usage = "@CTB"               # output with no args/bad args as well as -h
-    epilog = epilog             # output with -h
-    formatter_class = argparse.RawTextHelpFormatter # do not reformat multiline
+    command = "pangenomics_createdb"  # 'scripts <command>'
+    description = "@CTB"  # output with -h
+    usage = "@CTB"  # output with no args/bad args as well as -h
+    epilog = epilog  # output with -h
+    formatter_class = argparse.RawTextHelpFormatter  # do not reformat multiline
 
     def __init__(self, subparser):
         super().__init__(subparser)
         p = subparser
 
         p.add_argument(
-            '-t', '--taxonomy-file', '--taxonomy', metavar='FILE',
-            action="extend", nargs='+', required=True,
-            help='database lineages file'
+            "-t",
+            "--taxonomy-file",
+            "--taxonomy",
+            metavar="FILE",
+            action="extend",
+            nargs="+",
+            required=True,
+            help="database lineages file",
+        )
+        p.add_argument("sketches", nargs="+", help="sketches to combine")
+        p.add_argument("--scaled", default=1000, type=int)
+        p.add_argument("-k", "--ksize", default=31, type=int)
+        p.add_argument(
+            "-m", "--moltype"
+        )  # Use to assert that the moltype in the sketches == moltype use wants
+        p.add_argument(
+            "-o",
+            "--output",
+            required=True,
+            help="Define a filename for the pangenome signatures (.zip preferred).",
         )
         p.add_argument(
-            'sketches', nargs='+',
-            help='sketches to combine'
+            "--csv",
+            help="A CSV file generated to contain the lineage rank, genome name, hash count, and genome count.",
         )
-        p.add_argument('--scaled', default=1000, type=int)
-        p.add_argument('-k', '--ksize', default=31, type=int)
-        p.add_argument('-m', '--moltype') # Use to assert that the moltype in the sketches == moltype use wants
-        p.add_argument('-o', '--output', required=True,
-                        help='Define a filename for the pangenome signatures (.zip preferred).')
-        p.add_argument('--csv', help='A CSV file generated to contain the lineage rank, genome name, hash count, and genome count.')
-        p.add_argument('-r', '--rank', default='species')
-        p.add_argument('-a', '--abund', action='store_true', help='Enable abundance tracking of hashes across rank selection.')
+        p.add_argument("-r", "--rank", default="species")
+        p.add_argument(
+            "-a",
+            "--abund",
+            action="store_true",
+            help="Enable abundance tracking of hashes across rank selection.",
+        )
 
     def main(self, args):
         # code that we actually run.
@@ -54,44 +71,67 @@ class Command_CreateDB(CommandLinePlugin):
 
 
 class Command_RankTable(CommandLinePlugin):
-    command = 'pangenomics_ranktable'             # 'scripts <command>'
-    description = "@CTB"       # output with -h
-    usage = "@CTB"               # output with no args/bad args as well as -h
-    epilog = epilog             # output with -h
-    formatter_class = argparse.RawTextHelpFormatter # do not reformat multiline
+    command = "pangenomics_ranktable"  # 'scripts <command>'
+    description = "@CTB"  # output with -h
+    usage = "@CTB"  # output with no args/bad args as well as -h
+    epilog = epilog  # output with -h
+    formatter_class = argparse.RawTextHelpFormatter  # do not reformat multiline
 
     def __init__(self, subparser):
         super().__init__(subparser)
         p = subparser
-        p.add_argument('data', metavar='SOURMASH_DATABASE', help='The sourmash dictionary created from `process_ss.py`')
-        p.add_argument('-k', '--ksize', type=int, default=31, help='The ksize of the sourmash pangenome database')
-        p.add_argument('-l', '--lineage', help='The specific lineage to extract from the sourmash pangenome database (e.g. "s__Escherichia coli")')
-        p.add_argument('-i', '--ignore-case', action='store_true', help='Ignore the casing of search terms')
-        p.add_argument('-o', '--output-hash-classification', required=False,
-                       help='CSV file containing classification of each hash')
+        p.add_argument(
+            "data",
+            metavar="SOURMASH_DATABASE",
+            help="The sourmash dictionary created from `process_ss.py`",
+        )
+        p.add_argument(
+            "-k",
+            "--ksize",
+            type=int,
+            default=31,
+            help="The ksize of the sourmash pangenome database",
+        )
+        p.add_argument(
+            "-l",
+            "--lineage",
+            help='The specific lineage to extract from the sourmash pangenome database (e.g. "s__Escherichia coli")',
+        )
+        p.add_argument(
+            "-i",
+            "--ignore-case",
+            action="store_true",
+            help="Ignore the casing of search terms",
+        )
+        p.add_argument(
+            "-o",
+            "--output-hash-classification",
+            required=False,
+            help="CSV file containing classification of each hash",
+        )
 
     def main(self, args):
         # code that we actually run.
         super().main(args)
-        print('RUNNING cmd', self, args)
+        print("RUNNING cmd", self, args)
         return pangenome_elements_main(args)
 
 
 class Command_Classify(CommandLinePlugin):
-    command = 'pangenomics_classify'             # 'scripts <command>'
-    description = "@CTB"       # output with -h
-    usage = "@CTB"               # output with no args/bad args as well as -h
-    epilog = epilog             # output with -h
-    formatter_class = argparse.RawTextHelpFormatter # do not reformat multiline
+    command = "pangenomics_classify"  # 'scripts <command>'
+    description = "@CTB"  # output with -h
+    usage = "@CTB"  # output with no args/bad args as well as -h
+    epilog = epilog  # output with -h
+    formatter_class = argparse.RawTextHelpFormatter  # do not reformat multiline
 
     def __init__(self, subparser):
         super().__init__(subparser)
         p = subparser
         # add argparse arguments here.
-        debug_literal('RUNNING cmd_xyz.__init__')
-        p.add_argument('metagenome_sig')
-        p.add_argument('-k', '--ksize', default=31, help='k-mer size', type=int)
-        p.add_argument('classify_csv_files', nargs='+')
+        debug_literal("RUNNING cmd_xyz.__init__")
+        p.add_argument("metagenome_sig")
+        p.add_argument("-k", "--ksize", default=31, help="k-mer size", type=int)
+        p.add_argument("classify_csv_files", nargs="+")
 
     def main(self, args):
         # code that we actually run.
@@ -109,6 +149,7 @@ import os
 import sourmash
 from sourmash import sourmash_args
 from sourmash.tax import tax_utils
+
 
 def make_pangenome_sketches_main(args):
     print(f"loading taxonomies from {args.taxonomy_file}")
@@ -131,12 +172,13 @@ def make_pangenome_sketches_main(args):
         mf = db.manifest
         assert mf, "no matching sketches for given ksize!?"
 
-        if args.csv: chunk = []
+        if args.csv:
+            chunk = []
 
         # Work on a single signature at a time across the database
         for n, ss in enumerate(db.signatures()):
             if n and n % 1000 == 0:
-                print(f'...{n} - loading')
+                print(f"...{n} - loading")
 
             name = ss.name
             ident = tax_utils.get_ident(name)
@@ -144,13 +186,13 @@ def make_pangenome_sketches_main(args):
             # grab relevant lineage name
             try:
                 lineage_tup = taxdb[ident]
-            except KeyError: # older versions of genbank are not named with version!
+            except KeyError:  # older versions of genbank are not named with version!
                 try:
-                    if '.' in ident:
-                        short_ident = ident.split('.')[0]
+                    if "." in ident:
+                        short_ident = ident.split(".")[0]
                         lineage_tup = taxdb[short_ident]
                     else:
-                        for i in range(1,10):
+                        for i in range(1, 10):
                             try:
                                 new_ident = f"{ident}.{i}"
                                 lineage_tup = taxdb[new_ident]
@@ -164,7 +206,9 @@ def make_pangenome_sketches_main(args):
             lineage_pair = lineage_tup.lineage_at_rank(args.rank)
             lineage_name = lineage_pair[-1].name
 
-            ident_d[lineage_name] = ident # pick an ident to represent this set of pangenome sketches
+            ident_d[lineage_name] = (
+                ident  # pick an ident to represent this set of pangenome sketches
+            )
 
             # Accumulate the count within lineage names if `--abund` in cli
             if args.abund:
@@ -189,11 +233,20 @@ def make_pangenome_sketches_main(args):
                 # Accumulated counts of hashes in lineage by genome
                 hash_count = len(mh.hashes)
 
-                accum[lineage_name][name] = accum[lineage_name].get(name, 0) + hash_count
-                chunk.append({'lineage': lineage_name, 'sig_name': name, 'hash_count': hash_count, 'genome_count': n})
+                accum[lineage_name][name] = (
+                    accum[lineage_name].get(name, 0) + hash_count
+                )
+                chunk.append(
+                    {
+                        "lineage": lineage_name,
+                        "sig_name": name,
+                        "hash_count": hash_count,
+                        "genome_count": n,
+                    }
+                )
 
-            if args.csv and len(chunk) >= 1000: #args.chunk_size?
-                write_chunk(chunk, csv_file) #args.outputfilenameforcsv?
+            if args.csv and len(chunk) >= 1000:  # args.chunk_size?
+                write_chunk(chunk, csv_file)  # args.outputfilenameforcsv?
                 accum = defaultdict(dict)
                 chunk = []
 
@@ -203,13 +256,13 @@ def make_pangenome_sketches_main(args):
             accum = defaultdict(dict)
             chunk = []
 
-   # save!
+    # save!
     with sourmash_args.SaveSignaturesToLocation(args.output) as save_sigs:
         for n, (lineage_name, ident) in enumerate(ident_d.items()):
             if n and n % 1000 == 0:
-                print(f'...{n} - saving')
+                print(f"...{n} - saving")
 
-            sig_name = f'{ident} {lineage_name}'
+            sig_name = f"{ident} {lineage_name}"
 
             # retrieve merged MinHash
             mh = revtax_d[lineage_name]
@@ -223,16 +276,22 @@ def make_pangenome_sketches_main(args):
                 abund_mh.set_abundances(abund_d)
 
             # Create a signature with abundance only if `abund` in cli. Otherwise, create a 'flat' sig
-            ss = sourmash.SourmashSignature(abund_mh, name=sig_name) if args.abund else sourmash.SourmashSignature(mh, name=sig_name)
+            ss = (
+                sourmash.SourmashSignature(abund_mh, name=sig_name)
+                if args.abund
+                else sourmash.SourmashSignature(mh, name=sig_name)
+            )
 
             save_sigs.add(ss)
 
+
 # Chunk function to limit the memory used by the hash_count dict and list
 def write_chunk(chunk, output_file):
-    with open(output_file, 'a', newline='') as csvfile:
-        fieldnames = ['lineage', 'sig_name', 'hash_count', 'genome_count']
+    with open(output_file, "a", newline="") as csvfile:
+        fieldnames = ["lineage", "sig_name", "hash_count", "genome_count"]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writerows(chunk)
+
 
 def check_csv(csv_file):
     if csv_file is None:
@@ -244,6 +303,7 @@ def check_csv(csv_file):
     count_csv = os.path.splitext(csv_file)[0] + ".csv"
     return count_csv
 
+
 ### db_process function from script process_ss.py
 
 import sourmash
@@ -254,7 +314,15 @@ import os
 import re
 
 
-def db_process(filename, ignore_case, invert_match, user_input, process_db, k=31, lineage_name='None'):
+def db_process(
+    filename,
+    ignore_case,
+    invert_match,
+    user_input,
+    process_db,
+    k=31,
+    lineage_name="None",
+):
     bname = os.path.basename(filename)
     ss_dict = {}
     print(f"\nloading file {bname} as index => manifest")
@@ -279,47 +347,62 @@ def db_process(filename, ignore_case, invert_match, user_input, process_db, k=31
 
             def search_pattern(vals):
                 return all(not pattern.search(val) for val in vals)
+
         else:
 
             def search_pattern(vals):
                 return any(pattern.search(val) for val in vals)
 
         # find all matching rows.
-        sub_mf = mf.filter_on_columns(
-            search_pattern, ["name", "filename", "md5"]
-            )
-
+        sub_mf = mf.filter_on_columns(search_pattern, ["name", "filename", "md5"])
 
         selected_sigs = []
-        print(f'Found {len(sub_mf)} signatures in {bname}:')
+        print(f"Found {len(sub_mf)} signatures in {bname}:")
 
         for n, row in enumerate(sub_mf.rows, start=1):
             print(f'{n:<15} \033[0;31m{row.get("name")}\033[0m')
-            selected_sigs.append(row.get('name'))
-
+            selected_sigs.append(row.get("name"))
 
         if user_input:
             while True:
-                user_input = input('\nSelect signatures to process (Comma-separated index value, "all", or "quit"): ')
+                user_input = input(
+                    '\nSelect signatures to process (Comma-separated index value, "all", or "quit"): '
+                )
 
-                if user_input.strip().lower() == 'quit' or user_input.strip().lower() == 'q':
+                if (
+                    user_input.strip().lower() == "quit"
+                    or user_input.strip().lower() == "q"
+                ):
                     print("Exiting...")
                     sys.exit(0)
 
-                if user_input.strip().lower() == 'all' or user_input.strip().lower() == 'a':
+                if (
+                    user_input.strip().lower() == "all"
+                    or user_input.strip().lower() == "a"
+                ):
                     break
 
                 else:
                     try:
-                        #create a list of only digits no matter if letters or additional commas
-                        indices = [int(idx.strip()) for idx in user_input.split(',') if idx.strip().isdigit()]
+                        # create a list of only digits no matter if letters or additional commas
+                        indices = [
+                            int(idx.strip())
+                            for idx in user_input.split(",")
+                            if idx.strip().isdigit()
+                        ]
                         if not indices:
-                            raise ValueError("Invalid input string: Please enter a comma-separated integer list, 'all', or 'quit'.")
+                            raise ValueError(
+                                "Invalid input string: Please enter a comma-separated integer list, 'all', or 'quit'."
+                            )
 
-                        outlier = [idx for idx in indices if not 1 <= idx <= len(selected_sigs)]
+                        outlier = [
+                            idx for idx in indices if not 1 <= idx <= len(selected_sigs)
+                        ]
 
                         if outlier:
-                            raise ValueError(f'Out of range integers: {", ".join([str(item) for item in outlier])}')
+                            raise ValueError(
+                                f'Out of range integers: {", ".join([str(item) for item in outlier])}'
+                            )
 
                         indices = [n - 1 for n in indices]
                         selected_names = [selected_sigs[n] for n in indices]
@@ -331,7 +414,7 @@ def db_process(filename, ignore_case, invert_match, user_input, process_db, k=31
 
                         break
                     except Exception as e:
-                        print(f'{e}')
+                        print(f"{e}")
                         continue
 
         sub_picklist = sub_mf.to_picklist()
@@ -344,7 +427,7 @@ def db_process(filename, ignore_case, invert_match, user_input, process_db, k=31
         for ss in db.signatures():
             name = ss.name
 
-            print(f'Found \033[0;31m{name}\033[0m in {bname}')
+            print(f"Found \033[0;31m{name}\033[0m in {bname}")
 
             mh = ss.minhash
             hashes = mh.hashes
@@ -353,7 +436,9 @@ def db_process(filename, ignore_case, invert_match, user_input, process_db, k=31
         total_rows_examined = 0
         total_rows_examined += len(mf)
 
-        print(f"\nloaded {total_rows_examined} total that matched ksize & molecule type")
+        print(
+            f"\nloaded {total_rows_examined} total that matched ksize & molecule type"
+        )
 
         if ss_dict:
             print(f"extracted {len(ss_dict)} signatures from {len(db)} file(s)\n")
@@ -363,26 +448,27 @@ def db_process(filename, ignore_case, invert_match, user_input, process_db, k=31
             sys.exit(-1)
 
     else:
-        #process the entire database
+        # process the entire database
 
         if process_db:
             for n, ss in enumerate(db.signatures()):
 
-                if n % 10 ==0:
-                    print(f'...Processing {n} of {len(mf)}', end='\r', flush=True)
+                if n % 10 == 0:
+                    print(f"...Processing {n} of {len(mf)}", end="\r", flush=True)
 
                     name = ss.name
-
 
                     mh = ss.minhash
                     hashes = mh.hashes
                     ss_dict[name] = hashes
 
-                print(f'...Processed {n} of {len(mf)} \n')
+                print(f"...Processed {n} of {len(mf)} \n")
 
         else:
-            print('\nDid you mean to use `-l/--lineage-name` to process specific signatures?')
-            print('Nothing to process. Exiting...\n')
+            print(
+                "\nDid you mean to use `-l/--lineage-name` to process specific signatures?"
+            )
+            print("Nothing to process. Exiting...\n")
             sys.exit()
 
     return ss_dict
@@ -395,17 +481,19 @@ import argparse
 import csv
 
 
-CENTRAL_CORE=1
-EXTERNAL_CORE=2
-SHELL=3
-INNER_CLOUD=4
-SURFACE_CLOUD=5
+CENTRAL_CORE = 1
+EXTERNAL_CORE = 2
+SHELL = 3
+INNER_CLOUD = 4
+SURFACE_CLOUD = 5
 
-NAMES = { CENTRAL_CORE: 'central core',
-          EXTERNAL_CORE: 'external core',
-          SHELL: 'shell',
-          INNER_CLOUD: 'inner cloud',
-          SURFACE_CLOUD: 'surface cloud' }
+NAMES = {
+    CENTRAL_CORE: "central core",
+    EXTERNAL_CORE: "external core",
+    SHELL: "shell",
+    INNER_CLOUD: "inner cloud",
+    SURFACE_CLOUD: "surface cloud",
+}
 
 
 def pangenome_elements(data):
@@ -413,10 +501,10 @@ def pangenome_elements(data):
     for i, (key, nested_dict) in enumerate(data.items()):
         max_value = max(nested_dict.values())
 
-        central_core_threshold = 0.95 #0.95 is core , 90% is technically soft core
+        central_core_threshold = 0.95  # 0.95 is core , 90% is technically soft core
         external_core_threshold = 0.90
-        shell_threshold = 0.10 #0.10
-        inner_cloud_threshold = 0.01 # 0.0 is the full cloud, but trimming (0.001?) may be necessary to create the viz...?
+        shell_threshold = 0.10  # 0.10
+        inner_cloud_threshold = 0.01  # 0.0 is the full cloud, but trimming (0.001?) may be necessary to create the viz...?
         surface_cloud_threshold = 0.00
 
         central_core = []
@@ -438,24 +526,35 @@ def pangenome_elements(data):
                 surface_cloud.append((nested_key, nested_value))
         return central_core, external_core, shell, inner_cloud, surface_cloud
 
+
 def pangenome_elements_main(args):
-    ss_dict = db_process(filename=args.data, k=args.ksize, lineage_name=args.lineage, ignore_case=args.ignore_case, invert_match=False, user_input=False, process_db=True)
+    ss_dict = db_process(
+        filename=args.data,
+        k=args.ksize,
+        lineage_name=args.lineage,
+        ignore_case=args.ignore_case,
+        invert_match=False,
+        user_input=False,
+        process_db=True,
+    )
     results = pangenome_elements(data=ss_dict)
 
     if args.output_hash_classification:
-        print(f"Writing hash classification to CSV file '{args.output_hash_classification}'")
-        with open(args.output_hash_classification, 'w', newline='') as fp:
+        print(
+            f"Writing hash classification to CSV file '{args.output_hash_classification}'"
+        )
+        with open(args.output_hash_classification, "w", newline="") as fp:
             w = csv.writer(fp)
-            w.writerow(['hashval', 'pangenome_classification'])
+            w.writerow(["hashval", "pangenome_classification"])
             central_core, external_core, shell, inner_cloud, surface_cloud = results
 
             for xx, classify_code in (
-                    (central_core, CENTRAL_CORE),
-                    (external_core, EXTERNAL_CORE),
-                    (shell, SHELL),
-                    (inner_cloud, INNER_CLOUD),
-                    (surface_cloud, SURFACE_CLOUD)
-                    ):
+                (central_core, CENTRAL_CORE),
+                (external_core, EXTERNAL_CORE),
+                (shell, SHELL),
+                (inner_cloud, INNER_CLOUD),
+                (surface_cloud, SURFACE_CLOUD),
+            ):
                 for hashval, _ in xx:
                     w.writerow([hashval, classify_code])
 
@@ -471,6 +570,7 @@ import pprint
 
 from sourmash.save_load import SaveSignaturesToLocation
 
+
 def classify_hashes_main(args):
     db = sourmash.load_file_as_index(args.metagenome_sig)
     db = db.select(ksize=args.ksize)
@@ -484,13 +584,13 @@ def classify_hashes_main(args):
     shell_mh = minhash.copy_and_clear()
 
     for csv_file in args.classify_csv_files:
-        with open(csv_file, 'r', newline='') as fp:
+        with open(csv_file, "r", newline="") as fp:
             r = csv.DictReader(fp)
 
             classify_d = {}
             for row in r:
-                hashval = int(row['hashval'])
-                classify_as = int(row['pangenome_classification'])
+                hashval = int(row["hashval"])
+                classify_as = int(row["pangenome_classification"])
                 classify_d[hashval] = classify_as
 
         # now, classify_d has the classifications we care about. Let's
@@ -507,7 +607,6 @@ def classify_hashes_main(args):
                 central_core_mh.add_hash(hashval)
             elif classify == SHELL:
                 shell_mh.add_hash(hashval)
- 
 
         print(f"For '{csv_file}', signature '{sketch.name}' contains:")
         for int_id in sorted(NAMES):
@@ -519,9 +618,9 @@ def classify_hashes_main(args):
         count = counter_d.get(-1, 0)
         print(f"\t ...and {count} hashes are NOT IN the csv file")
 
-        #core_ss = sourmash.SourmashSignature(central_core_mh, name='core')
-        #with SaveSignaturesToLocation('core.sig.gz') as save_sig:
+        # core_ss = sourmash.SourmashSignature(central_core_mh, name='core')
+        # with SaveSignaturesToLocation('core.sig.gz') as save_sig:
         #    save_sig.add(core_ss)
-        #shell_ss = sourmash.SourmashSignature(shell_mh, name='shell')
-        #with SaveSignaturesToLocation('shell.sig.gz') as save_sig:
+        # shell_ss = sourmash.SourmashSignature(shell_mh, name='shell')
+        # with SaveSignaturesToLocation('shell.sig.gz') as save_sig:
         #    save_sig.add(shell_ss)
