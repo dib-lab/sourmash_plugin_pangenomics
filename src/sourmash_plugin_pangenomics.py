@@ -7,10 +7,35 @@ Need help? Have questions? Ask at http://github.com/sourmash-bio/sourmash/issues
 """
 
 import argparse
-import sourmash
+import sys
+from collections import Counter, defaultdict
+import csv
+import os
+import re
+import pprint
 
+import sourmash
+from sourmash import sourmash_args
+from sourmash.tax import tax_utils
 from sourmash.logging import debug_literal
 from sourmash.plugins import CommandLinePlugin
+from sourmash.save_load import SaveSignaturesToLocation
+
+
+CENTRAL_CORE = 1
+EXTERNAL_CORE = 2
+SHELL = 3
+INNER_CLOUD = 4
+SURFACE_CLOUD = 5
+
+NAMES = {
+    CENTRAL_CORE: "central core",
+    EXTERNAL_CORE: "external core",
+    SHELL: "shell",
+    INNER_CLOUD: "inner cloud",
+    SURFACE_CLOUD: "surface cloud",
+}
+
 
 ###
 
@@ -140,16 +165,6 @@ class Command_Classify(CommandLinePlugin):
 
 
 ### script make-pangenome-sketches.py
-
-import argparse
-import sys
-from collections import Counter, defaultdict
-import csv
-import os
-import sourmash
-from sourmash import sourmash_args
-from sourmash.tax import tax_utils
-
 
 def make_pangenome_sketches_main(args):
     print(f"loading taxonomies from {args.taxonomy_file}")
@@ -305,14 +320,6 @@ def check_csv(csv_file):
 
 
 ### db_process function from script process_ss.py
-
-import sourmash
-from sourmash import sourmash_args
-import argparse
-import sys
-import os
-import re
-
 
 def db_process(
     filename,
@@ -476,26 +483,6 @@ def db_process(
 
 ### script pangenome_elements.py
 
-import sys
-import argparse
-import csv
-
-
-CENTRAL_CORE = 1
-EXTERNAL_CORE = 2
-SHELL = 3
-INNER_CLOUD = 4
-SURFACE_CLOUD = 5
-
-NAMES = {
-    CENTRAL_CORE: "central core",
-    EXTERNAL_CORE: "external core",
-    SHELL: "shell",
-    INNER_CLOUD: "inner cloud",
-    SURFACE_CLOUD: "surface cloud",
-}
-
-
 def pangenome_elements(data):
     # get the pangenome elements of the dicts for each rank pangenome
     for i, (key, nested_dict) in enumerate(data.items()):
@@ -560,16 +547,6 @@ def pangenome_elements_main(args):
 
 
 ### script classify-hashes.py
-
-import sys
-import csv
-import argparse
-import sourmash
-from collections import defaultdict
-import pprint
-
-from sourmash.save_load import SaveSignaturesToLocation
-
 
 def classify_hashes_main(args):
     db = sourmash.load_file_as_index(args.metagenome_sig)
