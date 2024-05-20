@@ -44,7 +44,7 @@ rule build_classify_hashes:
 rule pangenome_classify:
     input:
         sig="SRR5650070.trim.sig.zip",
-        hash_csv="agathobacter_faecis.csv",
+        hash_csv="test_output/agathobacter_faecis.csv",
     output:
         "test_output/agathobacter_faecis_hashes.txt",
     shell: """
