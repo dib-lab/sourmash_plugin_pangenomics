@@ -7,10 +7,35 @@ Need help? Have questions? Ask at http://github.com/sourmash-bio/sourmash/issues
 """
 
 import argparse
-import sourmash
+import sys
+from collections import Counter, defaultdict
+import csv
+import os
+import re
+import pprint
 
+import sourmash
+from sourmash import sourmash_args
+from sourmash.tax import tax_utils
 from sourmash.logging import debug_literal
 from sourmash.plugins import CommandLinePlugin
+from sourmash.save_load import SaveSignaturesToLocation
+
+
+CENTRAL_CORE = 1
+EXTERNAL_CORE = 2
+SHELL = 3
+INNER_CLOUD = 4
+SURFACE_CLOUD = 5
+
+NAMES = {
+    CENTRAL_CORE: "central core",
+    EXTERNAL_CORE: "external core",
+    SHELL: "shell",
+    INNER_CLOUD: "inner cloud",
+    SURFACE_CLOUD: "surface cloud",
+}
+
 
 ###
 
@@ -20,9 +45,9 @@ from sourmash.plugins import CommandLinePlugin
 
 
 class Command_CreateDB(CommandLinePlugin):
-    command = "pangenomics_createdb"  # 'scripts <command>'
-    description = "@CTB"  # output with -h
-    usage = "@CTB"  # output with no args/bad args as well as -h
+    command = "pangenome_createdb"  # 'scripts <command>'
+    description = "create a database of sketches merged at given rank"  # output with -h
+    usage = "pangenome_createdb <db> -t <lineagedb> -o <merged>.zip"  # output with no args/bad args as well as -h
     epilog = epilog  # output with -h
     formatter_class = argparse.RawTextHelpFormatter  # do not reformat multiline
 
@@ -65,15 +90,14 @@ class Command_CreateDB(CommandLinePlugin):
         )
 
     def main(self, args):
-        # code that we actually run.
         super().main(args)
         return make_pangenome_sketches_main(args)
 
 
 class Command_RankTable(CommandLinePlugin):
-    command = "pangenomics_ranktable"  # 'scripts <command>'
-    description = "@CTB"  # output with -h
-    usage = "@CTB"  # output with no args/bad args as well as -h
+    command = "pangenome_ranktable"  # 'scripts <command>'
+    description = "create a CSV ranktable that annotates hashes with pangenome characters"  # output with -h
+    usage = "pangenome_ranktable <merged.zip> -o <ranktable>.csv -l <lineage>"  # output with no args/bad args as well as -h
     epilog = epilog  # output with -h
     formatter_class = argparse.RawTextHelpFormatter  # do not reformat multiline
 
@@ -83,7 +107,7 @@ class Command_RankTable(CommandLinePlugin):
         p.add_argument(
             "data",
             metavar="SOURMASH_DATABASE",
-            help="The sourmash dictionary created from `process_ss.py`",
+            help="The sourmash dictionary created from 'pangenome_creatdb --abund'",
         )
         p.add_argument(
             "-k",
@@ -111,45 +135,33 @@ class Command_RankTable(CommandLinePlugin):
         )
 
     def main(self, args):
-        # code that we actually run.
         super().main(args)
-        print("RUNNING cmd", self, args)
         return pangenome_elements_main(args)
 
 
 class Command_Classify(CommandLinePlugin):
-    command = "pangenomics_classify"  # 'scripts <command>'
-    description = "@CTB"  # output with -h
-    usage = "@CTB"  # output with no args/bad args as well as -h
+    command = "pangenome_classify"  # 'scripts <command>'
+    description = "classify the hashes in a sketch based on given ranktable characters"  # output with -h
+    usage = "pangenome_classify <sketch> <ranktable1> [<ranktable2> ...]"  # output with no args/bad args as well as -h
     epilog = epilog  # output with -h
     formatter_class = argparse.RawTextHelpFormatter  # do not reformat multiline
 
     def __init__(self, subparser):
         super().__init__(subparser)
         p = subparser
-        # add argparse arguments here.
-        debug_literal("RUNNING cmd_xyz.__init__")
         p.add_argument("metagenome_sig")
         p.add_argument("-k", "--ksize", default=31, help="k-mer size", type=int)
-        p.add_argument("classify_csv_files", nargs="+")
+        p.add_argument("ranktable_csv_files", nargs="+",
+                       help="rank tables produced by pangenome_ranktable")
 
     def main(self, args):
-        # code that we actually run.
         super().main(args)
         return classify_hashes_main(args)
 
 
-### script make-pangenome-sketches.py
-
-import argparse
-import sys
-from collections import Counter, defaultdict
-import csv
-import os
-import sourmash
-from sourmash import sourmash_args
-from sourmash.tax import tax_utils
-
+#
+# pangenome_createdb
+#
 
 def make_pangenome_sketches_main(args):
     print(f"loading taxonomies from {args.taxonomy_file}")
@@ -293,6 +305,7 @@ def write_chunk(chunk, output_file):
         writer.writerows(chunk)
 
 
+# @CTB do we need this?
 def check_csv(csv_file):
     if csv_file is None:
         return
@@ -302,16 +315,6 @@ def check_csv(csv_file):
 
     count_csv = os.path.splitext(csv_file)[0] + ".csv"
     return count_csv
-
-
-### db_process function from script process_ss.py
-
-import sourmash
-from sourmash import sourmash_args
-import argparse
-import sys
-import os
-import re
 
 
 def db_process(
@@ -474,28 +477,6 @@ def db_process(
     return ss_dict
 
 
-### script pangenome_elements.py
-
-import sys
-import argparse
-import csv
-
-
-CENTRAL_CORE = 1
-EXTERNAL_CORE = 2
-SHELL = 3
-INNER_CLOUD = 4
-SURFACE_CLOUD = 5
-
-NAMES = {
-    CENTRAL_CORE: "central core",
-    EXTERNAL_CORE: "external core",
-    SHELL: "shell",
-    INNER_CLOUD: "inner cloud",
-    SURFACE_CLOUD: "surface cloud",
-}
-
-
 def pangenome_elements(data):
     # get the pangenome elements of the dicts for each rank pangenome
     for i, (key, nested_dict) in enumerate(data.items()):
@@ -526,6 +507,9 @@ def pangenome_elements(data):
                 surface_cloud.append((nested_key, nested_value))
         return central_core, external_core, shell, inner_cloud, surface_cloud
 
+#
+# pangenome_ranktable
+#
 
 def pangenome_elements_main(args):
     ss_dict = db_process(
@@ -559,17 +543,9 @@ def pangenome_elements_main(args):
                     w.writerow([hashval, classify_code])
 
 
-### script classify-hashes.py
-
-import sys
-import csv
-import argparse
-import sourmash
-from collections import defaultdict
-import pprint
-
-from sourmash.save_load import SaveSignaturesToLocation
-
+#
+# pangenome_classify
+#
 
 def classify_hashes_main(args):
     db = sourmash.load_file_as_index(args.metagenome_sig)
@@ -583,7 +559,7 @@ def classify_hashes_main(args):
     central_core_mh = minhash.copy_and_clear()
     shell_mh = minhash.copy_and_clear()
 
-    for csv_file in args.classify_csv_files:
+    for csv_file in args.ranktable_csv_files:
         with open(csv_file, "r", newline="") as fp:
             r = csv.DictReader(fp)
 
@@ -617,10 +593,3 @@ def classify_hashes_main(args):
 
         count = counter_d.get(-1, 0)
         print(f"\t ...and {count} hashes are NOT IN the csv file")
-
-        # core_ss = sourmash.SourmashSignature(central_core_mh, name='core')
-        # with SaveSignaturesToLocation('core.sig.gz') as save_sig:
-        #    save_sig.add(core_ss)
-        # shell_ss = sourmash.SourmashSignature(shell_mh, name='shell')
-        # with SaveSignaturesToLocation('shell.sig.gz') as save_sig:
-        #    save_sig.add(shell_ss)

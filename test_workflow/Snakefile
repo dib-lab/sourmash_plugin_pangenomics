@@ -21,7 +21,7 @@ rule merge_agatha:
     output:
         pangenome_sig="agatha-merged.sig.zip",
     shell: """
-        sourmash scripts pangenomics_createdb {input.db} -t {input.tax} \
+        sourmash scripts pangenome_createdb {input.db} -t {input.tax} \
             -o {output} --abund -k 21
     """
         
@@ -36,7 +36,7 @@ rule build_classify_hashes:
         ksize=21,
         name="GCF_020557615 s__Agathobacter faecis",
     shell: """
-        sourmash scripts pangenomics_ranktable {input.pangenome_sig} \
+        sourmash scripts pangenome_ranktable {input.pangenome_sig} \
              -o {output.csv} -k {params.ksize} -l {params.name:q}
     """
 
@@ -47,6 +47,6 @@ rule pangenome_classify:
     output:
         "test_output/agathobacter_faecis_hashes.txt",
     shell: """
-        sourmash scripts pangenomics_classify {input.sig} {input.hash_csv} \
+        sourmash scripts pangenome_classify {input.sig} {input.hash_csv} \
             -k 21 > {output}
             """
