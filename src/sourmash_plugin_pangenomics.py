@@ -69,8 +69,9 @@ class Command_CreateDB(CommandLinePlugin):
         p.add_argument("--scaled", default=1000, type=int)
         p.add_argument("-k", "--ksize", default=31, type=int)
         p.add_argument(
-            "-m", "--moltype"
-        )  # Use to assert that the moltype in the sketches == moltype use wants
+            "-m", "--moltype",
+            default="DNA"
+        )
         p.add_argument(
             "-o",
             "--output",
@@ -91,7 +92,7 @@ class Command_CreateDB(CommandLinePlugin):
 
     def main(self, args):
         super().main(args)
-        return make_pangenome_sketches_main(args)
+        return pangenome_createdb_main(args)
 
 
 class Command_RankTable(CommandLinePlugin):
@@ -136,7 +137,7 @@ class Command_RankTable(CommandLinePlugin):
 
     def main(self, args):
         super().main(args)
-        return pangenome_elements_main(args)
+        return pangenome_ranktable_main(args)
 
 
 class Command_Classify(CommandLinePlugin):
@@ -163,7 +164,7 @@ class Command_Classify(CommandLinePlugin):
 # pangenome_createdb
 #
 
-def make_pangenome_sketches_main(args):
+def pangenome_createdb_main(args):
     print(f"loading taxonomies from {args.taxonomy_file}")
     taxdb = sourmash.tax.tax_utils.MultiLineageDB.load(args.taxonomy_file)
     print(f"found {len(taxdb)} identifiers in taxdb.")
@@ -181,6 +182,7 @@ def make_pangenome_sketches_main(args):
         print(f"loading file {filename} as index => manifest")
         db = sourmash_args.load_file_as_index(filename)
         db = db.select(ksize=args.ksize)
+        # @CTB check moltype
         mf = db.manifest
         assert mf, "no matching sketches for given ksize!?"
 
@@ -269,6 +271,7 @@ def make_pangenome_sketches_main(args):
             chunk = []
 
     # save!
+    print(f"Writing output sketches to '{args.output}'")
     with sourmash_args.SaveSignaturesToLocation(args.output) as save_sigs:
         for n, (lineage_name, ident) in enumerate(ident_d.items()):
             if n and n % 1000 == 0:
@@ -511,7 +514,7 @@ def pangenome_elements(data):
 # pangenome_ranktable
 #
 
-def pangenome_elements_main(args):
+def pangenome_ranktable_main(args):
     ss_dict = db_process(
         filename=args.data,
         k=args.ksize,
