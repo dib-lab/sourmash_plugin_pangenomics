@@ -1,5 +1,7 @@
 rule all:
     input:
+        "test_output/agatha-merged.sig.zip",
+        "test_output/agatha-merged-2.sig.zip",
         "test_output/agathobacter_faecis.csv",
         "test_output/agathobacter_faecis_hashes.txt",
 
@@ -19,17 +21,25 @@ rule merge_agatha:
         db="gtdb-rs214-agatha-k21.zip",
         tax="gtdb-rs214-agatha.lineages.csv.gz",
     output:
-        pangenome_sig="agatha-merged.sig.zip",
+        pangenome_sig="test_output/agatha-merged.sig.zip",
     shell: """
         sourmash scripts pangenome_createdb {input.db} -t {input.tax} \
             -o {output} --abund -k 21
     """
         
-
+rule merge_agatha_2:
+    input:
+        db="gtdb-rs214-agatha-k21.zip",
+    output:
+        pangenome_sig="test_output/agatha-merged-2.sig.zip",
+    shell: """
+        sourmash scripts pangenome_merge {input.db} \
+            -o {output} -k 21
+    """
 
 rule build_classify_hashes:
     input:
-        pangenome_sig="agatha-merged.sig.zip",
+        pangenome_sig="test_output/agatha-merged.sig.zip",
     output:
         csv="test_output/agathobacter_faecis.csv",
     params:

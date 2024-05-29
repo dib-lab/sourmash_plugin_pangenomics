@@ -10,7 +10,7 @@ pip install sourmash_plugin_pangenomics
 
 You can run all of these commands in the `test_workflow` directory of the git repository.
 
-### Build a pangenome database
+### Build a pangenome database using lineages
 
 (CTB: explain contents!)
 
@@ -34,6 +34,9 @@ total hashes: 27398
 summary of sketches:
    1 sketches with DNA, k=21, scaled=1000, abund      27398 total hashes
 ```
+
+Note: the command `pangenome_merge` (see below) will construct a pangenome
+sketch by merging all provided signatures.
 
 ### Build a pangenome "ranktable"
 
@@ -83,6 +86,21 @@ For 'test_output/agathobacter_faecis.csv', signature 'SRR5650070' contains:
          0 (0.0%) hashes are classified as surface cloud
          ...and 262716 hashes are NOT IN the csv file
 ```
+
+### Build a pangenome sketch without using lineages
+
+(CTB: explain contents!)
+
+The following command builds a pangenome sketch by combining all provided sketches. Here we use the sketches present in the `gtdb-rs214-agatha-k21.zip` file:
+
+```
+sourmash scripts pangenome_merge \
+    gtdb-rs214-agatha-k21.zip \
+    -o agatha-merged-2.sig.zip-k 21
+```
+
+The output file is `agatha-merged-2.sig.zip` and is identical
+(via e.g. `sourmash compare`) to the `agatha-merged.sig.zip` file.
 
 ## Support
 

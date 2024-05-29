@@ -3,7 +3,7 @@ name = "sourmash_plugin_pangenomics"
 description = "sourmash plugin to do pangenomics."
 readme = "README.md"
 requires-python = ">=3.10"
-version = "0.2"
+version = "0.3"
 authors = [
   {name = "Colton Baumler", email = "ccbaumler@ucdavis.edu"},
   {name = "Titus Brown", email = "titus@idyll.org"},
@@ -16,5 +16,6 @@ license = { text = "BSD 3-Clause License" }
 
 [project.entry-points."sourmash.cli_script"]
 createdb_command = "sourmash_plugin_pangenomics:Command_CreateDB"
+merge_command = "sourmash_plugin_pangenomics:Command_Merge"
 ranktable_command = "sourmash_plugin_pangenomics:Command_RankTable"
 classify_command = "sourmash_plugin_pangenomics:Command_Classify"
