@@ -323,9 +323,6 @@ def check_csv(csv_file):
 def db_process(
     filename,
     ignore_case,
-    invert_match,
-    user_input,
-    process_db,
     k=31,
     lineage_name="None",
 ):
@@ -349,15 +346,8 @@ def db_process(
         else:
             pattern = re.compile(pattern)
 
-        if invert_match:
-
-            def search_pattern(vals):
-                return all(not pattern.search(val) for val in vals)
-
-        else:
-
-            def search_pattern(vals):
-                return any(pattern.search(val) for val in vals)
+        def search_pattern(vals):
+            return any(pattern.search(val) for val in vals)
 
         # find all matching rows.
         sub_mf = mf.filter_on_columns(search_pattern, ["name", "filename", "md5"])
@@ -368,60 +358,6 @@ def db_process(
         for n, row in enumerate(sub_mf.rows, start=1):
             print(f'{n:<15} \033[0;31m{row.get("name")}\033[0m')
             selected_sigs.append(row.get("name"))
-
-        if user_input:
-            while True:
-                user_input = input(
-                    '\nSelect signatures to process (Comma-separated index value, "all", or "quit"): '
-                )
-
-                if (
-                    user_input.strip().lower() == "quit"
-                    or user_input.strip().lower() == "q"
-                ):
-                    print("Exiting...")
-                    sys.exit(0)
-
-                if (
-                    user_input.strip().lower() == "all"
-                    or user_input.strip().lower() == "a"
-                ):
-                    break
-
-                else:
-                    try:
-                        # create a list of only digits no matter if letters or additional commas
-                        indices = [
-                            int(idx.strip())
-                            for idx in user_input.split(",")
-                            if idx.strip().isdigit()
-                        ]
-                        if not indices:
-                            raise ValueError(
-                                "Invalid input string: Please enter a comma-separated integer list, 'all', or 'quit'."
-                            )
-
-                        outlier = [
-                            idx for idx in indices if not 1 <= idx <= len(selected_sigs)
-                        ]
-
-                        if outlier:
-                            raise ValueError(
-                                f'Out of range integers: {", ".join([str(item) for item in outlier])}'
-                            )
-
-                        indices = [n - 1 for n in indices]
-                        selected_names = [selected_sigs[n] for n in indices]
-
-                        def search_name(vals):
-                            return any(val in selected_names for val in vals)
-
-                        sub_mf = sub_mf.filter_on_columns(search_name, ["name"])
-
-                        break
-                    except Exception as e:
-                        print(f"{e}")
-                        continue
 
         sub_picklist = sub_mf.to_picklist()
 
@@ -456,26 +392,17 @@ def db_process(
     else:
         # process the entire database
 
-        if process_db:
-            for n, ss in enumerate(db.signatures()):
+        for n, ss in enumerate(db.signatures()):
+            if n % 10 == 0:
+                print(f"...Processing {n} of {len(mf)}", end="\r", flush=True)
 
-                if n % 10 == 0:
-                    print(f"...Processing {n} of {len(mf)}", end="\r", flush=True)
+                name = ss.name
 
-                    name = ss.name
+                mh = ss.minhash
+                hashes = mh.hashes
+                ss_dict[name] = hashes
 
-                    mh = ss.minhash
-                    hashes = mh.hashes
-                    ss_dict[name] = hashes
-
-                print(f"...Processed {n} of {len(mf)} \n")
-
-        else:
-            print(
-                "\nDid you mean to use `-l/--lineage-name` to process specific signatures?"
-            )
-            print("Nothing to process. Exiting...\n")
-            sys.exit()
+            print(f"...Processed {n} of {len(mf)} \n")
 
     return ss_dict
 
@@ -520,9 +447,6 @@ def pangenome_ranktable_main(args):
         k=args.ksize,
         lineage_name=args.lineage,
         ignore_case=args.ignore_case,
-        invert_match=False,
-        user_input=False,
-        process_db=True,
     )
     results = pangenome_elements(data=ss_dict)
 
