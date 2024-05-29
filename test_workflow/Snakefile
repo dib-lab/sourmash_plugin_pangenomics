@@ -39,7 +39,7 @@ rule merge_agatha_2:
 
 rule build_classify_hashes:
     input:
-        pangenome_sig="agatha-merged.sig.zip",
+        pangenome_sig="test_output/agatha-merged.sig.zip",
     output:
         csv="test_output/agathobacter_faecis.csv",
     params:
