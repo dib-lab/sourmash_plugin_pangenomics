@@ -95,6 +95,36 @@ class Command_CreateDB(CommandLinePlugin):
         return pangenome_createdb_main(args)
 
 
+class Command_Merge(CommandLinePlugin):
+    command = "pangenome_merge"  # 'scripts <command>'
+    description = "merge sketches into a pangenome database a la createdb"  # output with -h
+    usage = "pangenome_merge <sketches> -o <merged>.zip"  # output with no args/bad args as well as -h
+    epilog = epilog  # output with -h
+    formatter_class = argparse.RawTextHelpFormatter  # do not reformat multiline
+
+    def __init__(self, subparser):
+        super().__init__(subparser)
+        p = subparser
+
+        p.add_argument("sketches", nargs="+", help="sketches to combine")
+        p.add_argument("--scaled", default=1000, type=int)
+        p.add_argument("-k", "--ksize", default=31, type=int)
+        p.add_argument(
+            "-m", "--moltype",
+            default="DNA"
+        )
+        p.add_argument(
+            "-o",
+            "--output",
+            required=True,
+            help="Define a filename for the pangenome signatures (.zip preferred).",
+        )
+
+    def main(self, args):
+        super().main(args)
+        return pangenome_merge_main(args)
+
+
 class Command_RankTable(CommandLinePlugin):
     command = "pangenome_ranktable"  # 'scripts <command>'
     description = "create a CSV ranktable that annotates hashes with pangenome characters"  # output with -h
@@ -315,6 +345,51 @@ def check_csv(csv_file):
 
     count_csv = os.path.splitext(csv_file)[0] + ".csv"
     return count_csv
+
+
+#
+# pangenome_merge
+#
+
+def pangenome_merge_main(args):
+    # Load the database
+    for filename in args.sketches:
+        print(f"loading file {filename} as index => manifest")
+        db = sourmash_args.load_file_as_index(filename)
+        db = db.select(ksize=args.ksize)
+        # @CTB check moltype
+        mf = db.manifest
+        assert mf, "no matching sketches for given ksize!?"
+
+        c = Counter()
+        mh = None
+
+        # work across the entire database
+        for n, ss in enumerate(db.signatures()):
+            if n and n % 1000 == 0:
+                print(f"...{n} - loading")
+
+            c.update(ss.minhash.hashes)
+
+            if mh is None:
+                mh = ss.minhash.to_mutable()
+            else:
+                mh += ss.minhash
+
+    # save!
+    print(f"Writing output sketches to '{args.output}'")
+
+    sig_name = "merged" # @CTB update with --name?
+
+    abund_mh = mh.copy_and_clear() # hmm, don't need mh tracked above?
+    abund_mh.track_abundance = True
+    abund_mh.set_abundances(dict(c))
+
+    with sourmash_args.SaveSignaturesToLocation(args.output) as save_sigs:
+        print(f"saving to '{args.output}'")
+
+        ss = sourmash.SourmashSignature(abund_mh, name=sig_name)
+        save_sigs.add(ss)
 
 
 def db_process(
