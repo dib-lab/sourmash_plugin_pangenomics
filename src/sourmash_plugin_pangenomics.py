@@ -290,12 +290,9 @@ def pangenome_createdb_main(args):
                 abund_mh.track_abundance = True
                 abund_mh.set_abundances(abund_d)
 
-            # Create a signature with abundance only if `abund` in cli. Otherwise, create a 'flat' sig
-            ss = (
-                sourmash.SourmashSignature(abund_mh, name=sig_name)
-                if args.abund
-                else sourmash.SourmashSignature(mh, name=sig_name)
-            )
+                ss = sourmash.SourmashSignature(abund_mh, name=sig_name)
+            else:
+                ss = sourmash/SourmashSignature(mh, name=sig_name)
 
             save_sigs.add(ss)
 
@@ -448,7 +445,7 @@ def pangenome_ranktable_main(args):
         lineage_name=args.lineage,
         ignore_case=args.ignore_case,
     )
-    results = pangenome_elements(data=ss_dict)
+    results = pangenome_elements(ss_dict)
 
     if args.output_hash_classification:
         print(
