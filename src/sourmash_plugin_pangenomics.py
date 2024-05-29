@@ -69,8 +69,9 @@ class Command_CreateDB(CommandLinePlugin):
         p.add_argument("--scaled", default=1000, type=int)
         p.add_argument("-k", "--ksize", default=31, type=int)
         p.add_argument(
-            "-m", "--moltype"
-        )  # Use to assert that the moltype in the sketches == moltype use wants
+            "-m", "--moltype",
+            default="DNA"
+        )
         p.add_argument(
             "-o",
             "--output",
@@ -91,7 +92,7 @@ class Command_CreateDB(CommandLinePlugin):
 
     def main(self, args):
         super().main(args)
-        return make_pangenome_sketches_main(args)
+        return pangenome_createdb_main(args)
 
 
 class Command_RankTable(CommandLinePlugin):
@@ -136,7 +137,7 @@ class Command_RankTable(CommandLinePlugin):
 
     def main(self, args):
         super().main(args)
-        return pangenome_elements_main(args)
+        return pangenome_ranktable_main(args)
 
 
 class Command_Classify(CommandLinePlugin):
@@ -163,7 +164,7 @@ class Command_Classify(CommandLinePlugin):
 # pangenome_createdb
 #
 
-def make_pangenome_sketches_main(args):
+def pangenome_createdb_main(args):
     print(f"loading taxonomies from {args.taxonomy_file}")
     taxdb = sourmash.tax.tax_utils.MultiLineageDB.load(args.taxonomy_file)
     print(f"found {len(taxdb)} identifiers in taxdb.")
@@ -181,6 +182,7 @@ def make_pangenome_sketches_main(args):
         print(f"loading file {filename} as index => manifest")
         db = sourmash_args.load_file_as_index(filename)
         db = db.select(ksize=args.ksize)
+        # @CTB check moltype
         mf = db.manifest
         assert mf, "no matching sketches for given ksize!?"
 
@@ -269,6 +271,7 @@ def make_pangenome_sketches_main(args):
             chunk = []
 
     # save!
+    print(f"Writing output sketches to '{args.output}'")
     with sourmash_args.SaveSignaturesToLocation(args.output) as save_sigs:
         for n, (lineage_name, ident) in enumerate(ident_d.items()):
             if n and n % 1000 == 0:
@@ -287,12 +290,9 @@ def make_pangenome_sketches_main(args):
                 abund_mh.track_abundance = True
                 abund_mh.set_abundances(abund_d)
 
-            # Create a signature with abundance only if `abund` in cli. Otherwise, create a 'flat' sig
-            ss = (
-                sourmash.SourmashSignature(abund_mh, name=sig_name)
-                if args.abund
-                else sourmash.SourmashSignature(mh, name=sig_name)
-            )
+                ss = sourmash.SourmashSignature(abund_mh, name=sig_name)
+            else:
+                ss = sourmash/SourmashSignature(mh, name=sig_name)
 
             save_sigs.add(ss)
 
@@ -320,9 +320,6 @@ def check_csv(csv_file):
 def db_process(
     filename,
     ignore_case,
-    invert_match,
-    user_input,
-    process_db,
     k=31,
     lineage_name="None",
 ):
@@ -346,15 +343,8 @@ def db_process(
         else:
             pattern = re.compile(pattern)
 
-        if invert_match:
-
-            def search_pattern(vals):
-                return all(not pattern.search(val) for val in vals)
-
-        else:
-
-            def search_pattern(vals):
-                return any(pattern.search(val) for val in vals)
+        def search_pattern(vals):
+            return any(pattern.search(val) for val in vals)
 
         # find all matching rows.
         sub_mf = mf.filter_on_columns(search_pattern, ["name", "filename", "md5"])
@@ -365,60 +355,6 @@ def db_process(
         for n, row in enumerate(sub_mf.rows, start=1):
             print(f'{n:<15} \033[0;31m{row.get("name")}\033[0m')
             selected_sigs.append(row.get("name"))
-
-        if user_input:
-            while True:
-                user_input = input(
-                    '\nSelect signatures to process (Comma-separated index value, "all", or "quit"): '
-                )
-
-                if (
-                    user_input.strip().lower() == "quit"
-                    or user_input.strip().lower() == "q"
-                ):
-                    print("Exiting...")
-                    sys.exit(0)
-
-                if (
-                    user_input.strip().lower() == "all"
-                    or user_input.strip().lower() == "a"
-                ):
-                    break
-
-                else:
-                    try:
-                        # create a list of only digits no matter if letters or additional commas
-                        indices = [
-                            int(idx.strip())
-                            for idx in user_input.split(",")
-                            if idx.strip().isdigit()
-                        ]
-                        if not indices:
-                            raise ValueError(
-                                "Invalid input string: Please enter a comma-separated integer list, 'all', or 'quit'."
-                            )
-
-                        outlier = [
-                            idx for idx in indices if not 1 <= idx <= len(selected_sigs)
-                        ]
-
-                        if outlier:
-                            raise ValueError(
-                                f'Out of range integers: {", ".join([str(item) for item in outlier])}'
-                            )
-
-                        indices = [n - 1 for n in indices]
-                        selected_names = [selected_sigs[n] for n in indices]
-
-                        def search_name(vals):
-                            return any(val in selected_names for val in vals)
-
-                        sub_mf = sub_mf.filter_on_columns(search_name, ["name"])
-
-                        break
-                    except Exception as e:
-                        print(f"{e}")
-                        continue
 
         sub_picklist = sub_mf.to_picklist()
 
@@ -453,26 +389,17 @@ def db_process(
     else:
         # process the entire database
 
-        if process_db:
-            for n, ss in enumerate(db.signatures()):
+        for n, ss in enumerate(db.signatures()):
+            if n % 10 == 0:
+                print(f"...Processing {n} of {len(mf)}", end="\r", flush=True)
 
-                if n % 10 == 0:
-                    print(f"...Processing {n} of {len(mf)}", end="\r", flush=True)
+                name = ss.name
 
-                    name = ss.name
+                mh = ss.minhash
+                hashes = mh.hashes
+                ss_dict[name] = hashes
 
-                    mh = ss.minhash
-                    hashes = mh.hashes
-                    ss_dict[name] = hashes
-
-                print(f"...Processed {n} of {len(mf)} \n")
-
-        else:
-            print(
-                "\nDid you mean to use `-l/--lineage-name` to process specific signatures?"
-            )
-            print("Nothing to process. Exiting...\n")
-            sys.exit()
+            print(f"...Processed {n} of {len(mf)} \n")
 
     return ss_dict
 
@@ -511,17 +438,14 @@ def pangenome_elements(data):
 # pangenome_ranktable
 #
 
-def pangenome_elements_main(args):
+def pangenome_ranktable_main(args):
     ss_dict = db_process(
         filename=args.data,
         k=args.ksize,
         lineage_name=args.lineage,
         ignore_case=args.ignore_case,
-        invert_match=False,
-        user_input=False,
-        process_db=True,
     )
-    results = pangenome_elements(data=ss_dict)
+    results = pangenome_elements(ss_dict)
 
     if args.output_hash_classification:
         print(
