@@ -15,6 +15,7 @@ import re
 import pprint
 
 import sourmash
+import sourmash_utils
 from sourmash import sourmash_args
 from sourmash.tax import tax_utils
 from sourmash.logging import debug_literal
@@ -66,12 +67,6 @@ class Command_CreateDB(CommandLinePlugin):
             help="database lineages file",
         )
         p.add_argument("sketches", nargs="+", help="sketches to combine")
-        p.add_argument("--scaled", default=1000, type=int)
-        p.add_argument("-k", "--ksize", default=31, type=int)
-        p.add_argument(
-            "-m", "--moltype",
-            default="DNA"
-        )
         p.add_argument(
             "-o",
             "--output",
@@ -89,6 +84,7 @@ class Command_CreateDB(CommandLinePlugin):
             action="store_true",
             help="Enable abundance tracking of hashes across rank selection.",
         )
+        sourmash_utils.add_standard_minhash_args(p)
 
     def main(self, args):
         super().main(args)
