@@ -1,6 +1,8 @@
+.PHONY: all clean cleanall
 all:
 	snakemake -c 4 -p
 
-cleanall:
+clean:
 	snakemake -c 4 --delete-all-output
-	snakemake -c 4 -p
+
+cleanall: clean all
