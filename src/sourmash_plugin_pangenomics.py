@@ -15,6 +15,7 @@ import re
 import pprint
 
 import sourmash
+import sourmash_utils
 from sourmash import sourmash_args
 from sourmash.tax import tax_utils
 from sourmash.logging import debug_literal
@@ -66,12 +67,6 @@ class Command_CreateDB(CommandLinePlugin):
             help="database lineages file",
         )
         p.add_argument("sketches", nargs="+", help="sketches to combine")
-        p.add_argument("--scaled", default=1000, type=int)
-        p.add_argument("-k", "--ksize", default=31, type=int)
-        p.add_argument(
-            "-m", "--moltype",
-            default="DNA"
-        )
         p.add_argument(
             "-o",
             "--output",
@@ -89,6 +84,7 @@ class Command_CreateDB(CommandLinePlugin):
             action="store_true",
             help="Enable abundance tracking of hashes across rank selection.",
         )
+        sourmash_utils.add_standard_minhash_args(p)
 
     def main(self, args):
         super().main(args)
@@ -107,18 +103,13 @@ class Command_Merge(CommandLinePlugin):
         p = subparser
 
         p.add_argument("sketches", nargs="+", help="sketches to combine")
-        p.add_argument("--scaled", default=1000, type=int)
-        p.add_argument("-k", "--ksize", default=31, type=int)
-        p.add_argument(
-            "-m", "--moltype",
-            default="DNA"
-        )
         p.add_argument(
             "-o",
             "--output",
             required=True,
             help="Define a filename for the pangenome signatures (.zip preferred).",
         )
+        sourmash_utils.add_standard_minhash_args(p)
 
     def main(self, args):
         super().main(args)
@@ -141,13 +132,6 @@ class Command_RankTable(CommandLinePlugin):
             help="The sourmash dictionary created from 'pangenome_creatdb --abund'",
         )
         p.add_argument(
-            "-k",
-            "--ksize",
-            type=int,
-            default=31,
-            help="The ksize of the sourmash pangenome database",
-        )
-        p.add_argument(
             "-l",
             "--lineage",
             help='The specific lineage to extract from the sourmash pangenome database (e.g. "s__Escherichia coli")',
@@ -164,6 +148,7 @@ class Command_RankTable(CommandLinePlugin):
             required=False,
             help="CSV file containing classification of each hash",
         )
+        sourmash_utils.add_standard_minhash_args(p)
 
     def main(self, args):
         super().main(args)
@@ -181,9 +166,9 @@ class Command_Classify(CommandLinePlugin):
         super().__init__(subparser)
         p = subparser
         p.add_argument("metagenome_sig")
-        p.add_argument("-k", "--ksize", default=31, help="k-mer size", type=int)
         p.add_argument("ranktable_csv_files", nargs="+",
                        help="rank tables produced by pangenome_ranktable")
+        sourmash_utils.add_standard_minhash_args(p)
 
     def main(self, args):
         super().main(args)
@@ -207,14 +192,13 @@ def pangenome_createdb_main(args):
     if args.csv:
         csv_file = check_csv(args.csv)
 
+    select_mh = sourmash_utils.create_minhash_from_args(args)
+    print(f"selecting sketches: {select_mh}")
+
     # Load the database
     for filename in args.sketches:
-        print(f"loading file {filename} as index => manifest")
-        db = sourmash_args.load_file_as_index(filename)
-        db = db.select(ksize=args.ksize)
-        # @CTB check moltype
-        mf = db.manifest
-        assert mf, "no matching sketches for given ksize!?"
+        print(f"loading sketches from file {filename}")
+        db = sourmash_utils.load_index_and_select(filename, select_mh)
 
         if args.csv:
             chunk = []
@@ -322,7 +306,7 @@ def pangenome_createdb_main(args):
 
                 ss = sourmash.SourmashSignature(abund_mh, name=sig_name)
             else:
-                ss = sourmash/SourmashSignature(mh, name=sig_name)
+                ss = sourmash.SourmashSignature(mh, name=sig_name)
 
             save_sigs.add(ss)
 
@@ -352,14 +336,13 @@ def check_csv(csv_file):
 #
 
 def pangenome_merge_main(args):
+    select_mh = sourmash_utils.create_minhash_from_args(args)
+    print(f"selecting sketches: {select_mh}")
+
     # Load the database
     for filename in args.sketches:
-        print(f"loading file {filename} as index => manifest")
-        db = sourmash_args.load_file_as_index(filename)
-        db = db.select(ksize=args.ksize)
-        # @CTB check moltype
-        mf = db.manifest
-        assert mf, "no matching sketches for given ksize!?"
+        print(f"loading sketches from file {filename}")
+        db = sourmash_utils.load_index_and_select(filename, select_mh)
 
         c = Counter()
         mh = None
@@ -393,21 +376,18 @@ def pangenome_merge_main(args):
 
 
 def db_process(
-    filename,
-    ignore_case,
-    k=31,
-    lineage_name="None",
+        filename,
+        ignore_case,
+        select_mh=None,
+        lineage_name="None",
 ):
-    bname = os.path.basename(filename)
+    print(f"selecting sketches: {select_mh}")
+
     ss_dict = {}
-    print(f"\nloading file {bname} as index => manifest")
+    print(f"loading sketches from file '{filename}'")
+    db = sourmash_utils.load_index_and_select(filename, select_mh)
+    print(f"'{filename}' contains {len(db)} signatures")
 
-    db = sourmash_args.load_file_as_index(filename)
-    db = db.select(ksize=k)
-    mf = db.manifest
-    print(f"{bname} contains {len(mf)} signatures")
-
-    assert mf, "no matching sketches for given ksize!?"
     if lineage_name:
         print(f"Looking for {lineage_name} signature\n")
 
@@ -422,10 +402,11 @@ def db_process(
             return any(pattern.search(val) for val in vals)
 
         # find all matching rows.
+        mf = db.manifest
         sub_mf = mf.filter_on_columns(search_pattern, ["name", "filename", "md5"])
 
         selected_sigs = []
-        print(f"Found {len(sub_mf)} signatures in {bname}:")
+        print(f"Found {len(sub_mf)} signatures in '{filename}':")
 
         for n, row in enumerate(sub_mf.rows, start=1):
             print(f'{n:<15} \033[0;31m{row.get("name")}\033[0m')
@@ -441,7 +422,7 @@ def db_process(
         for ss in db.signatures():
             name = ss.name
 
-            print(f"Found \033[0;31m{name}\033[0m in {bname}")
+            print(f"Found \033[0;31m{name}\033[0m in '{filename}'")
 
             mh = ss.minhash
             hashes = mh.hashes
@@ -514,9 +495,11 @@ def pangenome_elements(data):
 #
 
 def pangenome_ranktable_main(args):
+    select_mh = sourmash_utils.create_minhash_from_args(args)
+
     ss_dict = db_process(
         filename=args.data,
-        k=args.ksize,
+        select_mh=select_mh,
         lineage_name=args.lineage,
         ignore_case=args.ignore_case,
     )
@@ -547,8 +530,10 @@ def pangenome_ranktable_main(args):
 #
 
 def classify_hashes_main(args):
-    db = sourmash.load_file_as_index(args.metagenome_sig)
-    db = db.select(ksize=args.ksize)
+    select_mh = sourmash_utils.create_minhash_from_args(args)
+    print(f"selecting sketches: {select_mh}")
+
+    db = sourmash_utils.load_index_and_select(args.metagenome_sig, select_mh)
     sketches = list(db.signatures())
     assert len(sketches) == 1
     sketch = sketches[0]

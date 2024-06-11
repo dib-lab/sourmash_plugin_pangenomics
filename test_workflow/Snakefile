@@ -24,7 +24,7 @@ rule merge_agatha:
         pangenome_sig="test_output/agatha-merged.sig.zip",
     shell: """
         sourmash scripts pangenome_createdb {input.db} -t {input.tax} \
-            -o {output} --abund -k 21
+            -o {output} --abund -k 21 --dna --scaled=1000
     """
         
 rule merge_agatha_2:

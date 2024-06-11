@@ -1,4 +1,4 @@
-.PHONY: dist test_workflow
+.PHONY: dist test_workflow clean cleanall
 
 all: test_workflow
 
@@ -14,7 +14,9 @@ install:
 test_workflow:
 	cd test_workflow && make
 
-cleanrun:
+clean: cd test_workflow && make clean
+
+cleanall:
 	cd test_workflow && make cleanall
 
 dist:
