@@ -203,14 +203,13 @@ def pangenome_createdb_main(args):
     if args.csv:
         csv_file = check_csv(args.csv)
 
+    select_mh = sourmash_utils.create_minhash_from_args(args)
+
     # Load the database
     for filename in args.sketches:
         print(f"loading file {filename} as index => manifest")
-        db = sourmash_args.load_file_as_index(filename)
-        db = db.select(ksize=args.ksize)
-        # @CTB check moltype
-        mf = db.manifest
-        assert mf, "no matching sketches for given ksize!?"
+
+        db = sourmash_utils.load_index_and_select(filename, select_mh)
 
         if args.csv:
             chunk = []
