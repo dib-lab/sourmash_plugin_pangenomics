@@ -9,7 +9,7 @@ authors = [
   {name = "Titus Brown", email = "titus@idyll.org"},
 ]
 
-dependencies = ["sourmash>=4.8.8,<5", "sourmash_utils>=0.2"]
+dependencies = ["sourmash>=4.8.9,<5", "sourmash_utils>=0.2"]
 
 [metadata]
 license = { text = "BSD 3-Clause License" }
