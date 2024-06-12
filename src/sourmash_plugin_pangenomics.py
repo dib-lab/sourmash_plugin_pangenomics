@@ -145,7 +145,7 @@ class Command_RankTable(CommandLinePlugin):
         p.add_argument(
             "-o",
             "--output-hash-classification",
-            required=False,
+            required=True,
             help="CSV file containing classification of each hash",
         )
         sourmash_utils.add_standard_minhash_args(p)
@@ -447,7 +447,7 @@ def db_process(
 
         for n, ss in enumerate(db.signatures()):
             if n % 10 == 0:
-                print(f"...Processing {n} of {len(mf)}", end="\r", flush=True)
+                print(f"...Processing {n} of {len(db)}", end="\r", flush=True)
 
                 name = ss.name
 
@@ -455,7 +455,7 @@ def db_process(
                 hashes = mh.hashes
                 ss_dict[name] = hashes
 
-            print(f"...Processed {n} of {len(mf)} \n")
+            print(f"...Processed {n+1} of {len(db)} \n")
 
     return ss_dict
 
