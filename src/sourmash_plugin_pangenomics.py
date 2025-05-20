@@ -22,6 +22,13 @@ from sourmash.logging import debug_literal
 from sourmash.plugins import CommandLinePlugin
 from sourmash.save_load import SaveSignaturesToLocation
 
+DEFAULT_THRESHOLDS = dict(
+    CENTRAL_CORE = 0.95,
+    EXTERNAL_CORE = 0.90,
+    SHELL = 0.10,
+    INNER_CLOUD = 0.01,
+    SURFACE_CLOUD = 0.00,
+)
 
 CENTRAL_CORE = 1
 EXTERNAL_CORE = 2
@@ -375,12 +382,14 @@ def pangenome_merge_main(args):
         save_sigs.add(ss)
 
 
-def db_process(
+def load_all_sketches(
         filename,
-        ignore_case,
+        *,
         select_mh=None,
-        lineage_name="None",
 ):
+    """
+    Process a database of sketches into a single merged pangenome sketch.
+    """
     print(f"selecting sketches: {select_mh}")
 
     ss_dict = {}
@@ -388,107 +397,137 @@ def db_process(
     db = sourmash_utils.load_index_and_select(filename, select_mh)
     print(f"'{filename}' contains {len(db)} signatures")
 
-    if lineage_name:
-        print(f"Looking for {lineage_name} signature\n")
+    # load the entire database
+    for n, ss in enumerate(db.signatures()):
+        if n % 10 == 0:
+            print(f"...Processing {n} of {len(db)}", end="\r", flush=True)
 
-        # build the search pattern
-        pattern = lineage_name
-        if ignore_case:
-            pattern = re.compile(pattern, re.IGNORECASE)
-        else:
-            pattern = re.compile(pattern)
-
-        def search_pattern(vals):
-            return any(pattern.search(val) for val in vals)
-
-        # find all matching rows.
-        mf = db.manifest
-        sub_mf = mf.filter_on_columns(search_pattern, ["name", "filename", "md5"])
-
-        selected_sigs = []
-        print(f"Found {len(sub_mf)} signatures in '{filename}':")
-
-        for n, row in enumerate(sub_mf.rows, start=1):
-            print(f'{n:<15} \033[0;31m{row.get("name")}\033[0m')
-            selected_sigs.append(row.get("name"))
-
-        sub_picklist = sub_mf.to_picklist()
-
-        try:
-            db = db.select(picklist=sub_picklist)
-        except ValueError:
-            error("Chosen lineage name input not supported")
-
-        for ss in db.signatures():
             name = ss.name
-
-            print(f"Found \033[0;31m{name}\033[0m in '{filename}'")
 
             mh = ss.minhash
             hashes = mh.hashes
             ss_dict[name] = hashes
 
-        total_rows_examined = 0
-        total_rows_examined += len(mf)
-
-        print(
-            f"\nloaded {total_rows_examined} total that matched ksize & molecule type"
-        )
-
-        if ss_dict:
-            print(f"extracted {len(ss_dict)} signatures from {len(db)} file(s)\n")
-
-        else:
-            print("no matching signatures found!\n")
-            sys.exit(-1)
-
-    else:
-        # process the entire database
-
-        for n, ss in enumerate(db.signatures()):
-            if n % 10 == 0:
-                print(f"...Processing {n} of {len(db)}", end="\r", flush=True)
-
-                name = ss.name
-
-                mh = ss.minhash
-                hashes = mh.hashes
-                ss_dict[name] = hashes
-
-            print(f"...Processed {n+1} of {len(db)} \n")
+        print(f"...Processed {n+1} of {len(db)} \n")
 
     return ss_dict
 
 
-def pangenome_elements(data):
+def load_sketches_by_lineage(filename,
+                             lineage_name,
+                             *,
+                             ignore_case=True,
+                             select_mh=None,
+):
+    """
+    Process a database of sketches into a set of merged pangenome sketches,
+    based on matches to lineage.
+    """
+    print(f"selecting sketches: {select_mh}")
+
+    ss_dict = {}
+    print(f"loading sketches from file '{filename}'")
+    db = sourmash_utils.load_index_and_select(filename, select_mh)
+    print(f"'{filename}' contains {len(db)} signatures")
+
+    print(f"Looking for {lineage_name} signature\n")
+
+    # build the search pattern
+    if ignore_case:
+        pattern = re.compile(lineage_name, re.IGNORECASE)
+    else:
+        pattern = re.compile(lineage_name)
+
+    def search_pattern(vals):
+        return any(pattern.search(val) for val in vals)
+
+    # find all matching rows.
+    mf = db.manifest
+    sub_mf = mf.filter_on_columns(search_pattern, ["name", "filename", "md5"])
+
+    selected_sigs = []
+    print(f"Found {len(sub_mf)} signatures in '{filename}':")
+
+    for n, row in enumerate(sub_mf.rows, start=1):
+        print(f'{n:<15} \033[0;31m{row.get("name")}\033[0m')
+        selected_sigs.append(row.get("name"))
+
+    sub_picklist = sub_mf.to_picklist()
+
+    try:
+        db = db.select(picklist=sub_picklist)
+    except ValueError:
+        error("Chosen lineage name input not supported")
+        raise
+
+    for ss in db.signatures():
+        name = ss.name
+
+        print(f"Found \033[0;31m{name}\033[0m in '{filename}'")
+
+        mh = ss.minhash
+        hashes = mh.hashes
+        ss_dict[name] = hashes
+
+    total_rows_examined = 0
+    total_rows_examined += len(mf)
+
+    print(
+        f"\nloaded {total_rows_examined} total that matched ksize & molecule type"
+    )
+
+    if ss_dict:
+        print(f"extracted {len(ss_dict)} signatures from {len(db)} file(s)\n")
+
+    else:
+        print("no matching signatures found!\n")
+        sys.exit(-1)
+
+    return ss_dict
+
+
+def calc_pangenome_element_frequency(data):
     # get the pangenome elements of the dicts for each rank pangenome
-    for i, (key, nested_dict) in enumerate(data.items()):
-        max_value = max(nested_dict.values())
+    for i, (name, hash_dict) in enumerate(data.items()):
+        # get max abundance in genome
+        max_value = max(hash_dict.values())
 
-        central_core_threshold = 0.95  # 0.95 is core , 90% is technically soft core
-        external_core_threshold = 0.90
-        shell_threshold = 0.10  # 0.10
-        inner_cloud_threshold = 0.01  # 0.0 is the full cloud, but trimming (0.001?) may be necessary to create the viz...?
-        surface_cloud_threshold = 0.00
+        # return all hashvals / hash_abunds, along with associated max value
+        items = hash_dict.items()
+        # sort by abund, highest first        
+        items = sorted(items, key=lambda x:-x[1])
+        for hashval, hash_abund in items:
+            freq = hash_abund / max_value
+            freq = round(freq, 4)
+            yield hashval, freq, hash_abund, max_value
 
-        central_core = []
-        external_core = []
-        shell = []
-        inner_cloud = []
-        surface_cloud = []
 
-        for nested_key, nested_value in nested_dict.items():
-            if nested_value >= max_value * central_core_threshold:
-                central_core.append((nested_key, nested_value))
-            elif nested_value >= max_value * external_core_threshold:
-                external_core.append((nested_key, nested_value))
-            elif nested_value >= max_value * shell_threshold:
-                shell.append((nested_key, nested_value))
-            elif nested_value >= max_value * inner_cloud_threshold:
-                inner_cloud.append((nested_key, nested_value))
-            elif nested_value >= max_value * surface_cloud_threshold:
-                surface_cloud.append((nested_key, nested_value))
-        return central_core, external_core, shell, inner_cloud, surface_cloud
+def classify_pangenome_element(freq, *, thresholds=DEFAULT_THRESHOLDS):
+    #central_core_threshold = 0.95  # 0.95 is core , 90% is technically soft core
+    #external_core_threshold = 0.90
+    #shell_threshold = 0.10  # 0.10
+    #inner_cloud_threshold = 0.01  # 0.0 is the full cloud, but trimming (0.001?) may be necessary to create the viz...?
+    #surface_cloud_threshold = 0.00
+
+    # validate thresholds
+    min_threshold = 1.
+    for k, v in thresholds.items():
+        assert v == float(v)    # must be number
+        min_threshold = min(min_threshold, v)
+    assert min_threshold == 0   # must catch all hashes :)
+
+    if freq >= thresholds['CENTRAL_CORE']:
+        return CENTRAL_CORE
+    if freq >= thresholds['EXTERNAL_CORE']:
+        return EXTERNAL_CORE
+    if freq >= thresholds['SHELL']:
+        return SHELL
+    if freq >= thresholds['INNER_CLOUD']:
+        return INNER_CLOUD
+    if freq >= thresholds['SURFACE_CLOUD']:
+        return SURFACE_CLOUD
+
+    raise Exception("a hash slipped through the cracks")
 
 #
 # pangenome_ranktable
@@ -497,13 +536,15 @@ def pangenome_elements(data):
 def pangenome_ranktable_main(args):
     select_mh = sourmash_utils.create_minhash_from_args(args)
 
-    ss_dict = db_process(
-        filename=args.data,
-        select_mh=select_mh,
-        lineage_name=args.lineage,
-        ignore_case=args.ignore_case,
-    )
-    results = pangenome_elements(ss_dict)
+    if args.lineage:
+        ss_dict = load_sketches_by_lineage(args.data,
+                                           args.lineage,
+                                           ignore_case=args.ignore_case,
+                                           select_mh=select_mh)
+    else:
+        ss_dict = load_all_sketches(args.data, select_mh=select_mh)
+
+    frequencies = calc_pangenome_element_frequency(ss_dict)
 
     if args.output_hash_classification:
         print(
@@ -511,18 +552,10 @@ def pangenome_ranktable_main(args):
         )
         with open(args.output_hash_classification, "w", newline="") as fp:
             w = csv.writer(fp)
-            w.writerow(["hashval", "pangenome_classification"])
-            central_core, external_core, shell, inner_cloud, surface_cloud = results
+            w.writerow(["hashval", "freq", "abund", "max_abund"])
 
-            for xx, classify_code in (
-                (central_core, CENTRAL_CORE),
-                (external_core, EXTERNAL_CORE),
-                (shell, SHELL),
-                (inner_cloud, INNER_CLOUD),
-                (surface_cloud, SURFACE_CLOUD),
-            ):
-                for hashval, _ in xx:
-                    w.writerow([hashval, classify_code])
+            for hashval, freq, hash_abund, max_value in frequencies:
+                w.writerow([hashval, freq, hash_abund, max_value])
 
 
 #
@@ -543,6 +576,7 @@ def classify_hashes_main(args):
     central_core_mh = minhash.copy_and_clear()
     shell_mh = minhash.copy_and_clear()
 
+    # load in all the frequencies etc, and classfy
     for csv_file in args.ranktable_csv_files:
         with open(csv_file, "r", newline="") as fp:
             r = csv.DictReader(fp)
@@ -550,7 +584,10 @@ def classify_hashes_main(args):
             classify_d = {}
             for row in r:
                 hashval = int(row["hashval"])
-                classify_as = int(row["pangenome_classification"])
+                abund = int(row["abund"])
+                max_abund = int(row["max_abund"])
+                freq = abund / max_abund
+                classify_as = classify_pangenome_element(freq)
                 classify_d[hashval] = classify_as
 
         # now, classify_d has the classifications we care about. Let's
