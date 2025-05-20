@@ -175,10 +175,13 @@ class Command_Classify(CommandLinePlugin):
         p.add_argument("metagenome_sig")
         p.add_argument("ranktable_csv_files", nargs="+",
                        help="rank tables produced by pangenome_ranktable")
+        p.add_argument("--thresholds",
+                       help="colon-separated thresholds for central core, external core, shell, inner cloud, surface cloud, e.g. 95:90:10:01:00 (which is the default")
         sourmash_utils.add_standard_minhash_args(p)
 
     def main(self, args):
         super().main(args)
+
         return classify_hashes_main(args)
 
 
@@ -361,20 +364,16 @@ def pangenome_merge_main(args):
 
             c.update(ss.minhash.hashes)
 
-            if mh is None:
-                mh = ss.minhash.to_mutable()
-            else:
-                mh += ss.minhash
-
     # save!
     print(f"Writing output sketches to '{args.output}'")
 
     sig_name = "merged" # @CTB update with --name?
 
-    abund_mh = mh.copy_and_clear() # hmm, don't need mh tracked above?
+    abund_mh = select_mh.copy_and_clear() # hmm, don't need mh tracked above?
     abund_mh.track_abundance = True
     abund_mh.set_abundances(dict(c))
 
+    assert not os.path.exists(args.output) # @CTB
     with sourmash_args.SaveSignaturesToLocation(args.output) as save_sigs:
         print(f"saving to '{args.output}'")
 
@@ -396,6 +395,8 @@ def load_all_sketches(
     print(f"loading sketches from file '{filename}'")
     db = sourmash_utils.load_index_and_select(filename, select_mh)
     print(f"'{filename}' contains {len(db)} signatures")
+
+    assert len(db) == 1, len(db)
 
     # load the entire database
     for n, ss in enumerate(db.signatures()):
@@ -494,8 +495,8 @@ def calc_pangenome_element_frequency(data):
 
         # return all hashvals / hash_abunds, along with associated max value
         items = hash_dict.items()
-        # sort by abund, highest first        
-        items = sorted(items, key=lambda x:-x[1])
+        # sort by abund, highest first
+        items = sorted(items, key=lambda x: -x[1])
         for hashval, hash_abund in items:
             freq = hash_abund / max_value
             freq = round(freq, 4)
@@ -503,12 +504,6 @@ def calc_pangenome_element_frequency(data):
 
 
 def classify_pangenome_element(freq, *, thresholds=DEFAULT_THRESHOLDS):
-    #central_core_threshold = 0.95  # 0.95 is core , 90% is technically soft core
-    #external_core_threshold = 0.90
-    #shell_threshold = 0.10  # 0.10
-    #inner_cloud_threshold = 0.01  # 0.0 is the full cloud, but trimming (0.001?) may be necessary to create the viz...?
-    #surface_cloud_threshold = 0.00
-
     # validate thresholds
     min_threshold = 1.
     for k, v in thresholds.items():
@@ -533,9 +528,11 @@ def classify_pangenome_element(freq, *, thresholds=DEFAULT_THRESHOLDS):
 # pangenome_ranktable
 #
 
+# @CTB - rename to count_hashes or something?
 def pangenome_ranktable_main(args):
     select_mh = sourmash_utils.create_minhash_from_args(args)
 
+    # load a pre-existing merged/etc database, calc hash info.
     if args.lineage:
         ss_dict = load_sketches_by_lineage(args.data,
                                            args.lineage,
@@ -563,6 +560,22 @@ def pangenome_ranktable_main(args):
 #
 
 def classify_hashes_main(args):
+    # @CTB print out the thresholds or something
+    thresholds_str = args.thresholds
+    thresholds = dict(DEFAULT_THRESHOLDS)
+    if thresholds_str:
+        threshold_vals = thresholds_str.split(':')
+        assert len(threshold_vals) == 5
+        threshold_vals = [ int(t)/100 for t in threshold_vals ]
+        assert max(threshold_vals) <= 1
+        assert min(threshold_vals) >= 0
+
+        thresholds['CENTRAL_CORE'] = threshold_vals[0]
+        thresholds['EXTERNAL_CORE'] = threshold_vals[1]
+        thresholds['SHELL'] = threshold_vals[2]
+        thresholds['INNER_CLOUD'] = threshold_vals[3]
+        thresholds['SURFACE_CLOUD'] = threshold_vals[4]
+    
     select_mh = sourmash_utils.create_minhash_from_args(args)
     print(f"selecting sketches: {select_mh}")
 
@@ -587,7 +600,10 @@ def classify_hashes_main(args):
                 abund = int(row["abund"])
                 max_abund = int(row["max_abund"])
                 freq = abund / max_abund
-                classify_as = classify_pangenome_element(freq)
+                classify_as = classify_pangenome_element(freq,
+                                                         thresholds=thresholds)
+
+                assert hashval not in classify_d, "hashval already encountered"
                 classify_d[hashval] = classify_as
 
         # now, classify_d has the classifications we care about. Let's
