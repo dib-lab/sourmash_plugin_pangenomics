@@ -222,23 +222,23 @@ def pangenome_createdb_main(args):
             ident = tax_utils.get_ident(name)
 
             # grab relevant lineage name
-            try:
-                lineage_tup = taxdb[ident]
-            except KeyError:  # older versions of genbank are not named with version!
-                try:
-                    if "." in ident:
-                        short_ident = ident.split(".")[0]
-                        lineage_tup = taxdb[short_ident]
-                    else:
-                        for i in range(1, 10):
-                            try:
-                                new_ident = f"{ident}.{i}"
-                                lineage_tup = taxdb[new_ident]
-                                break
-                            except KeyError:
-                                continue
-                except:
-                    print("Wow, that sucks!")
+            lineage_tup = taxdb.get(ident)
+
+            # not found and has a .? maybe we can strip off the version.
+            if lineage_tup is None and "." in ident:
+                short_ident = ident.split(".")[0]
+                lineage_tup = taxdb.get(ident)
+
+            # not found and has no .? Try many versions.
+            if lineage_tup is None and "." not in ident:
+                for i in range(1, 10):
+                    new_ident = f"{ident}.{i}"
+                    lineage_tup = taxdb.get(new_ident)
+                    if lineage_tup is not None:
+                        break
+
+            if lineage_tup is None:
+                raise Exception(f"cannot find ident {ident} in the tax db by hook or by crook")
 
             lineage_tup = tax_utils.RankLineageInfo(lineage=lineage_tup)
             lineage_pair = lineage_tup.lineage_at_rank(args.rank)
