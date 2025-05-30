@@ -239,10 +239,11 @@ def pangenome_createdb_main(args):
                         break
 
             if lineage_tup is None:
-                print(f"The top three closest matches to {ident} are:")
+                print(f"cannot find ident {ident} in the provided taxonomy ifle.")
+                print(f"The three closest matches to {ident} are:")
                 for k in get_close_matches(ident, taxdb):
                     print(f"* '{k}'")
-                raise Exception(f"cannot find ident {ident} in the tax db by hook or by crook")
+                sys.exit(-1)
 
             lineage_tup = tax_utils.RankLineageInfo(lineage=lineage_tup)
             lineage_pair = lineage_tup.lineage_at_rank(args.rank)
