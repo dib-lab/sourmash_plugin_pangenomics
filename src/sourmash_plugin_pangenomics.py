@@ -13,6 +13,7 @@ import csv
 import os
 import re
 import pprint
+from difflib import get_close_matches
 
 import sourmash
 import sourmash_utils
@@ -238,6 +239,9 @@ def pangenome_createdb_main(args):
                         break
 
             if lineage_tup is None:
+                print(f"The top three closest matches to {ident} are:")
+                for k in get_close_matches(ident, taxdb):
+                    print(f"* '{k}'")
                 raise Exception(f"cannot find ident {ident} in the tax db by hook or by crook")
 
             lineage_tup = tax_utils.RankLineageInfo(lineage=lineage_tup)
