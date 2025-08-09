@@ -14,6 +14,7 @@ import os
 import re
 import pprint
 from difflib import get_close_matches
+import gzip
 
 import sourmash
 import sourmash_utils
@@ -156,6 +157,12 @@ class Command_RankTable(CommandLinePlugin):
             required=True,
             help="CSV file containing classification of each hash",
         )
+        p.add_argument(
+            "--gzip",
+            action="store_true",
+            help="Maximumly compress the hash classification CSV with gzip!"
+        )
+
         sourmash_utils.add_standard_minhash_args(p)
 
     def main(self, args):
@@ -328,7 +335,11 @@ def pangenome_createdb_main(args):
 
 # Chunk function to limit the memory used by the hash_count dict and list
 def write_chunk(chunk, output_file):
-    with open(output_file, "a", newline="") as csvfile:
+    if output_file.endswith('.gz'):
+        csvfile = gzip.open(output_file, "at", newline="", encoding="utf-8")
+    else:
+        csvfile = open(output_file, "a", newline="", encoding="utf-8")
+    with csvfile:
         fieldnames = ["lineage", "sig_name", "hash_count", "genome_count"]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writerows(chunk)
@@ -552,13 +563,29 @@ def pangenome_ranktable_main(args):
         print(
             f"Writing hash classification to CSV file '{args.output_hash_classification}'"
         )
-        with open(args.output_hash_classification, "w", newline="") as fp:
-            w = csv.writer(fp)
-            w.writerow(["hashval", "freq", "abund", "max_abund"])
+        output_file = args.output_hash_classification
 
-            for hashval, freq, hash_abund, max_value in frequencies:
-                w.writerow([hashval, freq, hash_abund, max_value])
+        use_gzip = (
+            getattr(args, "gzip", False)
+            or output_file.endswith(".gz")
+        )
 
+        if use_gzip and not output_file.endswith(".gz"):
+            output_file += ".gz"
+
+        if use_gzip:
+            with gzip.open(output_file, "wt", newline="", compresslevel=9) as fp:
+                w = csv.writer(fp)
+                w.writerow(["hashval", "freq", "abund", "max_abund"])
+                for hashval, freq, hash_abund, max_value in frequencies:
+                    w.writerow([hashval, freq, hash_abund, max_value])
+        else:
+            with open(args.output_hash_classification, "w", newline="") as fp:
+                w = csv.writer(fp)
+                w.writerow(["hashval", "freq", "abund", "max_abund"])
+
+                for hashval, freq, hash_abund, max_value in frequencies:
+                    w.writerow([hashval, freq, hash_abund, max_value])
 
 #
 # pangenome_classify
@@ -595,6 +622,13 @@ def classify_hashes_main(args):
     shell_mh = minhash.copy_and_clear()
 
     # load in all the frequencies etc, and classfy
+    for csv_file in args.ranktable_csv_files:
+        if csv_file.endswith('.gz'):
+            fp = gzip.open(csv_file, "rt", newline="", encoding="utf-8")
+        else:
+            fp = open(csv_file, "r", newline="", encoding="utf-8")
+        with fp:
+            r = csv.DictReader(fp)
     for csv_file in args.ranktable_csv_files:
         with open(csv_file, "r", newline="") as fp:
             r = csv.DictReader(fp)
