@@ -92,6 +92,11 @@ class Command_CreateDB(CommandLinePlugin):
             action="store_true",
             help="Enable abundance tracking of hashes across rank selection.",
         )
+        p.add_argument(
+            "--skip-missing-lineages",
+            action="store_true",
+            help="Skip empty lineages to write the DB without them"
+        )
         sourmash_utils.add_standard_minhash_args(p)
 
     def main(self, args):
@@ -239,11 +244,14 @@ def pangenome_createdb_main(args):
                         break
 
             if lineage_tup is None:
-                print(f"cannot find ident {ident} in the provided taxonomy ifle.")
+                print(f"cannot find ident {ident} in the provided taxonomy file.")
                 print(f"The three closest matches to {ident} are:")
                 for k in get_close_matches(ident, taxdb):
                     print(f"* '{k}'")
-                sys.exit(-1)
+                if not getattr(args, "skip_missing_lineages", False):
+                    sys.exit(-1)
+                else:
+                    continue
 
             lineage_tup = tax_utils.RankLineageInfo(lineage=lineage_tup)
             lineage_pair = lineage_tup.lineage_at_rank(args.rank)
