@@ -64,7 +64,6 @@ class Command_CreateDB(CommandLinePlugin):
         super().__init__(subparser)
         p = subparser
 
-        p.add_argument("--empty")
         p.add_argument(
             "-t",
             "--taxonomy-file",
