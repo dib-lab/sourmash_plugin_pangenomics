@@ -64,6 +64,7 @@ class Command_CreateDB(CommandLinePlugin):
         super().__init__(subparser)
         p = subparser
 
+        p.add_argument("--empty")
         p.add_argument(
             "-t",
             "--taxonomy-file",
@@ -255,11 +256,11 @@ def pangenome_createdb_main(args):
 
             # Accumulate the count within lineage names if `--abund` in cli
             if args.abund:
-                c = Counter(ss.minhash.hashes)
+                c = set(ss.minhash.hashes)
                 if lineage_name in counts:
                     counts[lineage_name].update(c)
                 else:
-                    counts[lineage_name] = c
+                    counts[lineage_name] = Counter(c)
 
             # track merged sketches
             mh = revtax_d.get(lineage_name)
