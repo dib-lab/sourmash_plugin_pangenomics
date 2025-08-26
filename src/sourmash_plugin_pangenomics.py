@@ -255,11 +255,14 @@ def pangenome_createdb_main(args):
 
             # Accumulate the count within lineage names if `--abund` in cli
             if args.abund:
-                c = set(ss.minhash.hashes)
+                # explicitly discard abundances when counting an individual
+                # sketch by using `set` to force this to an iteratable
+                # rather than a mapping
+                c = Counter(set(ss.minhash.hashes))
                 if lineage_name in counts:
                     counts[lineage_name].update(c)
                 else:
-                    counts[lineage_name] = Counter(c)
+                    counts[lineage_name] = c
 
             # track merged sketches
             mh = revtax_d.get(lineage_name)
