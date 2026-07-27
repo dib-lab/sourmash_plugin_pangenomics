@@ -14,6 +14,7 @@ import os
 import re
 import pprint
 from difflib import get_close_matches
+import gzip
 
 import sourmash
 import sourmash_utils
@@ -468,7 +469,13 @@ def load_sketches_by_lineage(filename,
 
 def lineage_count(taxonomy, name, rank="species"):
     count = 0
-    with open(taxonomy, newline="") as fp:
+
+    if taxonomy.endswith(".gz"):
+        fp = gzip.open(taxonomy, mode="rt", newline="")
+    else:
+        fp = open(taxonomy, mode="r", newline="")
+
+    with fp:
         reader = csv.DictReader(fp)
         for row in reader:
             if row[rank] == name:
