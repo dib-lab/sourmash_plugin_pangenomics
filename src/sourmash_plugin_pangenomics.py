@@ -90,7 +90,7 @@ class Command_CreateDB(CommandLinePlugin):
             "-a",
             "--abund",
             action="store_true",
-            help="Enable abundance tracking of hashes across rank selection.",
+            help="Enable abundance tracking of hashes across rank selection. I.e. Bastardize the abundance metric to count frequency across genomes instead of abundance of kmer across genomes.",
         )
         sourmash_utils.add_standard_minhash_args(p)
 
@@ -137,7 +137,17 @@ class Command_RankTable(CommandLinePlugin):
         p.add_argument(
             "data",
             metavar="SOURMASH_DATABASE",
-            help="The sourmash dictionary created from 'pangenome_creatdb --abund'",
+            help="The sourmash dictionary created from 'pangenome_creatdb --abund'. Must be a single signature.",
+        )
+        p.add_argument(
+            "-t",
+            "--taxonomy-file",
+            help="The taxonomy file that was used to create the sourmash pangenome database the signature is from..."
+        )
+        p.add_argument(
+            "-r",
+            "--rank",
+            help="The rank of the lineage being used as the header of the taxonomy file. I.e. species, genus, family so on"
         )
         p.add_argument(
             "-l",
@@ -191,143 +201,105 @@ class Command_Classify(CommandLinePlugin):
 #
 
 def pangenome_createdb_main(args):
-    print(f"loading taxonomies from {args.taxonomy_file}")
-    taxdb = sourmash.tax.tax_utils.MultiLineageDB.load(args.taxonomy_file)
-    print(f"found {len(taxdb)} identifiers in taxdb.")
+    print(f"Loading taxonomies from {args.taxonomy_file}")
+    taxdb = tax_utils.MultiLineageDB.load(args.taxonomy_file)
+    print(f"Found {len(taxdb)} identifiers in taxdb.")
 
     ident_d = {}
     revtax_d = {}
-    accum = defaultdict(dict)
-    if args.abund:
-        counts = {}
+    do_abund = args.abund
+    do_csv = args.csv
+    target_rank = args.rank
+
+    counts = defaultdict(Counter) if args.abund else None
+
     if args.csv:
         csv_file = check_csv(args.csv)
+        chunk = []
 
     select_mh = sourmash_utils.create_minhash_from_args(args)
-    print(f"selecting sketches: {select_mh}")
+    print(f"Selecting sketches: {select_mh}")
 
-    # Load the database
     for filename in args.sketches:
-        print(f"loading sketches from file {filename}")
+        print(f"Loading sketches from file {filename}")
         db = sourmash_utils.load_index_and_select(filename, select_mh)
 
-        if args.csv:
-            chunk = []
-
-        # Work on a single signature at a time across the database
         for n, ss in enumerate(db.signatures()):
-            if n and n % 1000 == 0:
+            if n > 0 and n % 1000 == 0:
                 print(f"...{n} - loading")
 
-            name = ss.name
-            ident = tax_utils.get_ident(name)
+            sig_name = ss.name
+            ss_mh = ss.minhash
+            ident = tax_utils.get_ident(sig_name)
 
-            # grab relevant lineage name
             lineage_tup = taxdb.get(ident)
 
-            # not found and has a .? maybe we can strip off the version.
-            if lineage_tup is None and "." in ident:
-                short_ident = ident.split(".")[0]
-                lineage_tup = taxdb.get(ident)
-
-            # not found and has no .? Try many versions.
-            if lineage_tup is None and "." not in ident:
-                for i in range(1, 10):
-                    new_ident = f"{ident}.{i}"
-                    lineage_tup = taxdb.get(new_ident)
-                    if lineage_tup is not None:
-                        break
+            if lineage_tup is None:
+                if "." in ident:
+                    lineage_tup = taxdb.get(ident.split(".")[0])
+                else:
+                    for i in range(1, 10):
+                        lineage_tup = taxdb.get(f"{ident}.{i}")
+                        if lineage_tup is not None:
+                            break
 
             if lineage_tup is None:
-                print(f"cannot find ident {ident} in the provided taxonomy ifle.")
-                print(f"The three closest matches to {ident} are:")
-                for k in get_close_matches(ident, taxdb):
+                print(f"Cannot find ident '{ident}' in the provided taxonomy file.")
+                print(f"The three closest matches to '{ident}' are:")
+                for k in get_close_matches(ident, taxdb.keys(), n=3):
                     print(f"* '{k}'")
                 sys.exit(-1)
 
             lineage_tup = tax_utils.RankLineageInfo(lineage=lineage_tup)
-            lineage_pair = lineage_tup.lineage_at_rank(args.rank)
+            lineage_pair = lineage_tup.lineage_at_rank(target_rank)
             lineage_name = lineage_pair[-1].name
 
-            ident_d[lineage_name] = (
-                ident  # pick an ident to represent this set of pangenome sketches
-            )
+            ident_d[lineage_name] = ident
 
-            # Accumulate the count within lineage names if `--abund` in cli
-            if args.abund:
-                # explicitly discard abundances when counting an individual
-                # sketch by using `set` to force this to an iteratable
-                # rather than a mapping
-                c = Counter(set(ss.minhash.hashes))
-                if lineage_name in counts:
-                    counts[lineage_name].update(c)
-                else:
-                    counts[lineage_name] = c
-
-            # track merged sketches
-            mh = revtax_d.get(lineage_name)
-
-            if mh is None:
-                mh = ss.minhash.to_mutable()
-                revtax_d[lineage_name] = mh
+            if lineage_name not in revtax_d:
+                revtax_d[lineage_name] = ss.minhash.to_mutable()
             else:
-                mh += ss.minhash
+                revtax_d[lineage_name] += ss.minhash
 
-            ## Add {name, hash_count} to a lineage key then
-            ## create a simpler dict for writing the csv
-            if args.csv:
-                # Accumulated counts of hashes in lineage by genome
-                hash_count = len(mh.hashes)
+            if do_abund:
+                counts[lineage_name].update(set(ss.minhash.hashes))
 
-                accum[lineage_name][name] = (
-                    accum[lineage_name].get(name, 0) + hash_count
-                )
-                chunk.append(
-                    {
-                        "lineage": lineage_name,
-                        "sig_name": name,
-                        "hash_count": hash_count,
-                        "genome_count": n,
-                    }
-                )
+            if do_csv:
+                hash_count = len(revtax_d[lineage_name].hashes)
+                chunk.append({
+                    "lineage": lineage_name,
+                    "sig_name": name,
+                    "hash_count": hash_count,
+                    "genome_count": n,
+                })
 
-            if args.csv and len(chunk) >= 1000:  # args.chunk_size?
-                write_chunk(chunk, csv_file)  # args.outputfilenameforcsv?
-                accum = defaultdict(dict)
-                chunk = []
+                # Write chunk if it reaches capacity
+                if len(chunk) >= 1000:
+                    write_chunk(chunk, csv_file)
+                    chunk = []
 
-        # Write remaining data
-        if args.csv and len(chunk) > 0:
-            write_chunk(chunk, csv_file)
-            accum = defaultdict(dict)
-            chunk = []
+    if do_csv and chunk:
+        write_chunk(chunk, csv_file)
 
-    # save!
     print(f"Writing output sketches to '{args.output}'")
     with sourmash_args.SaveSignaturesToLocation(args.output) as save_sigs:
         for n, (lineage_name, ident) in enumerate(ident_d.items()):
-            if n and n % 1000 == 0:
+            if n > 0 and n % 1000 == 0:
                 print(f"...{n} - saving")
 
             sig_name = f"{ident} {lineage_name}"
-
-            # retrieve merged MinHash
             mh = revtax_d[lineage_name]
 
-            # Add abundance to signature if `--abund` in cli
-            if args.abund:
+            if do_abund:
                 abund_d = dict(counts[lineage_name])
-
                 abund_mh = mh.copy_and_clear()
                 abund_mh.track_abundance = True
                 abund_mh.set_abundances(abund_d)
-
                 ss = sourmash.SourmashSignature(abund_mh, name=sig_name)
             else:
                 ss = sourmash.SourmashSignature(mh, name=sig_name)
 
             save_sigs.add(ss)
-
 
 # Chunk function to limit the memory used by the hash_count dict and list
 def write_chunk(chunk, output_file):
@@ -494,13 +466,32 @@ def load_sketches_by_lineage(filename,
 
     return ss_dict
 
+def lineage_count(taxonomy, name, rank="species"):
+    count = 0
+    with open(taxonomy, newline="") as fp:
+        reader = csv.DictReader(fp)
+        for row in reader:
+            if row[rank] == name:
+                count += 1
 
-def calc_pangenome_element_frequency(data):
+    return count
+
+def calc_pangenome_element_frequency(data, taxonomy, rank):
+
     # get the pangenome elements of the dicts for each rank pangenome
-    for i, (name, hash_dict) in enumerate(data.items()):
+    for name, hash_dict in data.items():
+        lineage_name = " ".join(name.split(" ")[1:])
+        if lineage_name.endswith(" singlehash"):
+            lineage_name = lineage_name.removesuffix(' singlehash') #https://stackoverflow.com/questions/3663450/remove-substring-only-at-the-end-of-string#comment110394307_61432766
+        print(lineage_name)
+        tax_max_value = lineage_count(taxonomy, lineage_name, rank="species")
         # get max abundance in genome
         max_value = max(hash_dict.values())
+        # number of genomes with this lineage
+        print(max_value, tax_max_value)
 
+        if max_value <= tax_max_value:
+            max_value = tax_max_value
         # return all hashvals / hash_abunds, along with associated max value
         items = hash_dict.items()
         # sort by abund, highest first
@@ -549,7 +540,7 @@ def pangenome_ranktable_main(args):
     else:
         ss_dict = load_all_sketches(args.data, select_mh=select_mh)
 
-    frequencies = calc_pangenome_element_frequency(ss_dict)
+    frequencies = calc_pangenome_element_frequency(ss_dict, args.taxonomy_file, args.rank)
 
     if args.output_hash_classification:
         print(
