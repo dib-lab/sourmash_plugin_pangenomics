@@ -473,28 +473,22 @@ def lineage_count(taxonomy, name, rank="species"):
         for row in reader:
             if row[rank] == name:
                 count += 1
-
     return count
 
 def calc_pangenome_element_frequency(data, taxonomy, rank):
-
-    # get the pangenome elements of the dicts for each rank pangenome
     for name, hash_dict in data.items():
         lineage_name = " ".join(name.split(" ")[1:])
+
         if lineage_name.endswith(" singlehash"):
             lineage_name = lineage_name.removesuffix(' singlehash') #https://stackoverflow.com/questions/3663450/remove-substring-only-at-the-end-of-string#comment110394307_61432766
-        print(lineage_name)
+
         tax_max_value = lineage_count(taxonomy, lineage_name, rank="species")
-        # get max abundance in genome
         max_value = max(hash_dict.values())
-        # number of genomes with this lineage
-        print(max_value, tax_max_value)
 
         if max_value <= tax_max_value:
             max_value = tax_max_value
-        # return all hashvals / hash_abunds, along with associated max value
+
         items = hash_dict.items()
-        # sort by abund, highest first
         items = sorted(items, key=lambda x: -x[1])
         for hashval, hash_abund in items:
             freq = hash_abund / max_value
