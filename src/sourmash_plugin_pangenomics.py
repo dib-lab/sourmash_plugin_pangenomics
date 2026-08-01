@@ -265,7 +265,10 @@ def pangenome_createdb_main(args):
             lineage_pair = lineage_tup.lineage_at_rank(target_rank)
             lineage_name = lineage_pair[-1].name
 
-            ident_d[lineage_name] = ident
+            if lineage_name not in ident_d:
+                ident_d[lineage_name] = ident
+            else:
+                ident_d[lineage_name] = min(ident_d[lineage_name], ident)
 
             if lineage_name not in revtax_d:
                 revtax_d[lineage_name] = ss.minhash.to_mutable()
