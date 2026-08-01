@@ -59,7 +59,7 @@ rule build_classify_hashes:
         csv="test_output/agathobacter_faecis.csv",
     params:
         ksize=21,
-        name="GCF_020557615 s__Agathobacter faecis",
+        name="GCF_020557615.1 s__Agathobacter faecis",
     shell: """
         sourmash scripts pangenome_ranktable {input.pangenome_sig} \
 	     --taxonomy-file {input.tax} --rank species \
