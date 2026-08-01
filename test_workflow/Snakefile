@@ -21,10 +21,22 @@ rule merge_agatha:
         db="gtdb-rs214-agatha-k21.zip",
         tax="gtdb-rs214-agatha.lineages.csv.gz",
     output:
-        pangenome_sig="test_output/agatha-merged.sig.zip",
+        pangenome_sig="test_output/agatha-merged-genome-abund.sig.zip",
     shell: """
         sourmash scripts pangenome_createdb {input.db} -t {input.tax} \
             -o {output} --abund -k 21 --dna --scaled=1000
+	    #no rank defaults to species
+    """
+ 
+rule merge_agatha_no_abund:
+    input:
+        db="gtdb-rs214-agatha-k21.zip",
+        tax="gtdb-rs214-agatha.lineages.csv.gz",
+    output:
+        pangenome_sig="test_output/agatha-merged-no-abund.sig.zip",
+    shell: """
+        sourmash scripts pangenome_createdb {input.db} -t {input.tax} \
+            -o {output} -k 21 --dna --scaled=1000
 	    #no rank defaults to species
     """
         
