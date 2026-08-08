@@ -96,8 +96,11 @@ class Command_CreateDB(CommandLinePlugin):
         p.add_argument(
             "-a",
             "--abund",
-            action="store_true",
-            help="Enable abundance tracking of hashes across rank selection. I.e. Bastardize the abundance metric to count frequency across genomes instead of abundance of kmer across genomes.",
+            default='genome',
+            const='genome',
+            nargs='?',
+            choices=['kmer','genome'],
+            help="Enable abundance tracking of hashes across rank selection or the standard kmer abundance accumulation across genomes. I.e. Bastardize the abundance metric to count frequency across genomes instead of abundance of kmer across genomes.",
         )
         sourmash_utils.add_standard_minhash_args(p)
 
@@ -276,11 +279,17 @@ def pangenome_createdb_main(args):
                 revtax_d[lineage_name] += ss.minhash
 
             if do_abund:
-                counts[lineage_name].update(set(ss.minhash.hashes))
+                if do_abund == 'genome':
+                    counts[lineage_name].update(set(ss.minhash.hashes))
+                elif do_abund == 'kmer':
+                    counts[lineage_name].update(ss.minhash.hashes)
+                else:
+                    print('"-a" or "--abund" requires either "kmer" or "genome". Defaulting to "genome".')
+                    sys.exit(1)
 
-                top_hash, top_count = counts[lineage_name].most_common(1)[0]
-                print("Most Abundant Hash:", top_hash)
-                print("Highest Count:", top_count)
+                #top_hash, top_count = counts[lineage_name].most_common(1)[0]
+                #print("Most Abundant Hash:", top_hash)
+                #print("Highest Count:", top_count)
 
             if do_csv:
                 hash_count = len(revtax_d[lineage_name].hashes)
