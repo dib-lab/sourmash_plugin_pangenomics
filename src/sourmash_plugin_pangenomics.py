@@ -53,6 +53,12 @@ NAMES = {
 # CLI plugins - supports 'sourmash scripts <commands>'
 #
 
+class CustomRankLineageInfo(tax_utils.RankLineageInfo):
+    def lineage_at_rank(self, rank):
+        "Return tuple of LineagePairs at specified rank, including empty ranks."
+        self.check_rank_availability(rank)
+        rank_idx = self.rank_index(rank)
+        return self.lineage[: rank_idx + 1]
 
 class Command_CreateDB(CommandLinePlugin):
     command = "pangenome_createdb"  # 'scripts <command>'
@@ -90,8 +96,11 @@ class Command_CreateDB(CommandLinePlugin):
         p.add_argument(
             "-a",
             "--abund",
-            action="store_true",
-            help="Enable abundance tracking of hashes across rank selection. I.e. Bastardize the abundance metric to count frequency across genomes instead of abundance of kmer across genomes.",
+            default='genome',
+            const='genome',
+            nargs='?',
+            choices=['kmer','genome'],
+            help="Enable abundance tracking of hashes across rank selection or the standard kmer abundance accumulation across genomes. I.e. Bastardize the abundance metric to count frequency across genomes instead of abundance of kmer across genomes.",
         )
         sourmash_utils.add_standard_minhash_args(p)
 
@@ -221,7 +230,9 @@ def pangenome_createdb_main(args):
     select_mh = sourmash_utils.create_minhash_from_args(args)
     print(f"Selecting sketches: {select_mh}")
 
-    for filename in args.sketches:
+    missing_idents = set()
+
+    for filename in sorted(args.sketches):
         print(f"Loading sketches from file {filename}")
         db = sourmash_utils.load_index_and_select(filename, select_mh)
 
@@ -237,25 +248,30 @@ def pangenome_createdb_main(args):
 
             if lineage_tup is None:
                 if "." in ident:
-                    lineage_tup = taxdb.get(ident.split(".")[0])
+                    a_ident = ident.split(".")[0]
+                    lineage_tup = taxdb.get(a_ident)
+                    if lineage_tup is not None:
+                        ident = a_ident
                 else:
                     for i in range(1, 10):
-                        lineage_tup = taxdb.get(f"{ident}.{i}")
+                        b_ident = f"{ident}.{i}"
+                        lineage_tup = taxdb.get(b_ident)
                         if lineage_tup is not None:
+                            ident = b_ident
                             break
 
             if lineage_tup is None:
-                print(f"Cannot find ident '{ident}' in the provided taxonomy file.")
-                print(f"The three closest matches to '{ident}' are:")
-                for k in get_close_matches(ident, taxdb.keys(), n=3):
-                    print(f"* '{k}'")
-                sys.exit(-1)
+                missing_idents.add(ident)
+                continue
 
-            lineage_tup = tax_utils.RankLineageInfo(lineage=lineage_tup)
+            lineage_tup = CustomRankLineageInfo(lineage=lineage_tup)
             lineage_pair = lineage_tup.lineage_at_rank(target_rank)
             lineage_name = lineage_pair[-1].name
 
-            ident_d[lineage_name] = ident
+            if lineage_name not in ident_d:
+                ident_d[lineage_name] = ident
+            else:
+                ident_d[lineage_name] = min(ident_d[lineage_name], ident)
 
             if lineage_name not in revtax_d:
                 revtax_d[lineage_name] = ss.minhash.to_mutable()
@@ -263,24 +279,47 @@ def pangenome_createdb_main(args):
                 revtax_d[lineage_name] += ss.minhash
 
             if do_abund:
-                counts[lineage_name].update(set(ss.minhash.hashes))
+                if do_abund == 'genome':
+                    counts[lineage_name].update(set(ss.minhash.hashes))
+                elif do_abund == 'kmer':
+                    counts[lineage_name].update(ss.minhash.hashes)
+                else:
+                    print('"-a" or "--abund" requires either "kmer" or "genome". Defaulting to "genome".')
+                    sys.exit(1)
+
+                #top_hash, top_count = counts[lineage_name].most_common(1)[0]
+                #print("Most Abundant Hash:", top_hash)
+                #print("Highest Count:", top_count)
 
             if do_csv:
                 hash_count = len(revtax_d[lineage_name].hashes)
                 chunk.append({
                     "lineage": lineage_name,
-                    "sig_name": name,
+                    "sig_name": sig_name, 
                     "hash_count": hash_count,
                     "genome_count": n,
                 })
 
-                # Write chunk if it reaches capacity
                 if len(chunk) >= 1000:
                     write_chunk(chunk, csv_file)
                     chunk = []
 
     if do_csv and chunk:
         write_chunk(chunk, csv_file)
+
+    if missing_idents:
+        print(f"\nProcessing {len(missing_idents)} unique missing lineages...")
+        taxdb_keys = list(taxdb.keys())  # Convert once for speed
+
+        with open("failed_to_find_lineage.txt", "w") as f:
+            for missing_id in missing_idents:
+                print(f"Cannot find ident '{missing_id}' in the provided taxonomy file.", file=f)
+                print(f"The three closest matches to '{missing_id}' are:", file=f)
+
+                # Expensive fuzzy matching only runs ONCE per missing unique ID
+                for k in get_close_matches(missing_id, taxdb_keys, n=3):
+                    print(f"* '{k}'", file=f)
+                print("", file=f)
 
     print(f"Writing output sketches to '{args.output}'")
     with sourmash_args.SaveSignaturesToLocation(args.output) as save_sigs:

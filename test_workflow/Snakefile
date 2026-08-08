@@ -1,6 +1,7 @@
 rule all:
     input:
-        "test_output/agatha-merged.sig.zip",
+        "test_output/agatha-merged-genome-abund.sig.zip",
+        "test_output/agatha-merged-no-abund.sig.zip",
         "test_output/agatha-merged-2.sig.zip",
         "test_output/agathobacter_faecis.csv",
         "test_output/agathobacter_faecis_hashes.txt",
@@ -21,10 +22,22 @@ rule merge_agatha:
         db="gtdb-rs214-agatha-k21.zip",
         tax="gtdb-rs214-agatha.lineages.csv.gz",
     output:
-        pangenome_sig="test_output/agatha-merged.sig.zip",
+        pangenome_sig="test_output/agatha-merged-genome-abund.sig.zip",
     shell: """
         sourmash scripts pangenome_createdb {input.db} -t {input.tax} \
             -o {output} --abund -k 21 --dna --scaled=1000
+	    #no rank defaults to species
+    """
+ 
+rule merge_agatha_no_abund:
+    input:
+        db="gtdb-rs214-agatha-k21.zip",
+        tax="gtdb-rs214-agatha.lineages.csv.gz",
+    output:
+        pangenome_sig="test_output/agatha-merged-no-abund.sig.zip",
+    shell: """
+        sourmash scripts pangenome_createdb {input.db} -t {input.tax} \
+            -o {output} -k 21 --dna --scaled=1000
 	    #no rank defaults to species
     """
         
@@ -40,13 +53,13 @@ rule merge_agatha_2:
 
 rule build_classify_hashes:
     input:
-        pangenome_sig="test_output/agatha-merged.sig.zip",
+        pangenome_sig="test_output/agatha-merged-genome-abund.sig.zip",
         tax="gtdb-rs214-agatha.lineages.csv.gz",
     output:
         csv="test_output/agathobacter_faecis.csv",
     params:
         ksize=21,
-        name="GCF_020557615 s__Agathobacter faecis",
+        name="GCA_000433615.1 s__Agathobacter faecis",
     shell: """
         sourmash scripts pangenome_ranktable {input.pangenome_sig} \
 	     --taxonomy-file {input.tax} --rank species \
