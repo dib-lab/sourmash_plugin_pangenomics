@@ -221,18 +221,22 @@ def pangenome_createdb_main(args):
     select_mh = sourmash_utils.create_minhash_from_args(args)
     print(f"Selecting sketches: {select_mh}")
 
+    # create an ident-to-lineage mapping:
+    ident_to_lineage_d = {}
+
+    # iterate over sketch manifests to match species to lineages.
+    # this is (much) faster than iterating over signatures and will
+    # let us do most error handling up front.
+
     for filename in args.sketches:
-        print(f"Loading sketches from file {filename}")
+        print(f"Loading manifests from file {filename}")
         db = sourmash_utils.load_index_and_select(filename, select_mh)
+        mf = db.manifest
 
-        for n, ss in enumerate(db.signatures()):
-            if n > 0 and n % 1000 == 0:
-                print(f"...{n} - loading")
-
-            sig_name = ss.name
-            ss_mh = ss.minhash
-            ident = tax_utils.get_ident(sig_name)
-
+        for n, row in enumerate(mf.rows):
+            name = row['name']
+            ident = tax_utils.get_ident(name)
+            
             # CTB: could use 'keep_identifier_versions=True' here to keep
             # the version, e.g. GCA_000433615.1 instead of GCA_000433615.
             lineage_tup = taxdb.get(ident)
@@ -259,6 +263,25 @@ def pangenome_createdb_main(args):
             lineage_pair = lineage_tup.lineage_at_rank(target_rank)
             lineage_name = lineage_pair[-1].name
 
+            ident_to_lineage_d[ident] = lineage_name
+
+    # now iterate over sketches, retrieving lineage names directly from
+    # ident_to_lineage_d
+    for filename in args.sketches:
+        print(f"Loading sketches from file {filename}")
+        db = sourmash_utils.load_index_and_select(filename, select_mh)
+
+        for n, ss in enumerate(db.signatures()):
+            if n > 0 and n % 1000 == 0:
+                print(f"...{n} - loading")
+
+            sig_name = ss.name
+            ss_mh = ss.minhash
+            ident = tax_utils.get_ident(sig_name)
+
+            lineage_name = ident_to_lineage_d[ident]
+
+            # now merge minhashes, etc. etc.
             ident_d[lineage_name] = ident
 
             if lineage_name not in revtax_d:
