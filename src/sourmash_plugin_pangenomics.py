@@ -233,9 +233,13 @@ def pangenome_createdb_main(args):
             ss_mh = ss.minhash
             ident = tax_utils.get_ident(sig_name)
 
+            # CTB: could use 'keep_identifier_versions=True' here to keep
+            # the version, e.g. GCA_000433615.1 instead of GCA_000433615.
             lineage_tup = taxdb.get(ident)
 
             if lineage_tup is None:
+                # CTB: this 'if' will never happen with the 'get_ident' call
+                # as above.
                 if "." in ident:
                     lineage_tup = taxdb.get(ident.split(".")[0])
                 else:
