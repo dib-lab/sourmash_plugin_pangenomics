@@ -239,11 +239,13 @@ def pangenome_createdb_main(args):
             
             # CTB: could use 'keep_identifier_versions=True' here to keep
             # the version, e.g. GCA_000433615.1 instead of GCA_000433615.
+            ident = tax_utils.get_ident(name)
+
             lineage_tup = taxdb.get(ident)
 
             if lineage_tup is None:
                 # CTB: this 'if' will never happen with the 'get_ident' call
-                # as above.
+                # as above; 'ident' will never have a period in it.
                 if "." in ident:
                     lineage_tup = taxdb.get(ident.split(".")[0])
                 else:
